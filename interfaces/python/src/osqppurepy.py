@@ -45,7 +45,7 @@ class OSQP(object):
 
         # check if number of integer variables less than the size of variables
         p = 0
-        if int_idx is not None
+        if int_idx is not None:
             if len(int_idx) > n:
                 raise ValueError("Dimension of int_idx larger than n")
             else:
@@ -107,9 +107,9 @@ class OSQP(object):
         l = np.maximum(l, -self._model.constant('OSQP_INFTY'))
 
 
-        self._model.setup((n, m), P.data, P.indices, P.indptr, q,
+        self._model.setup((n, m, p), P.data, P.indices, P.indptr, q,
                           A.data, A.indices, A.indptr,
-                          l, u, **settings)
+                          l, u, int_idx, **settings)
 
     def update(self, **kwargs):
         """
