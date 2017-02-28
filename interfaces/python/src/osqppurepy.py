@@ -9,8 +9,9 @@ from scipy import sparse
 
 
 class OSQP(object):
+
     def __init__(self):
-        self._model = _osqppurepy.OSQP()
+        self._model = None
 
     def version(self):
         return self._model.version()
@@ -22,7 +23,7 @@ class OSQP(object):
 
         minimize    1/2 x' * P * x + q' * x
         subject to  l <= A * x <= u
-                    x_i \in Z for i in int_idx
+                    x_i in Z for i in int_idx
 
         solver settings can be specified as additional keyword arguments.
         """
@@ -106,10 +107,16 @@ class OSQP(object):
         u = np.minimum(u, self._model.constant('OSQP_INFTY'))
         l = np.maximum(l, -self._model.constant('OSQP_INFTY'))
 
-
-        self._model.setup((n, m, p), P.data, P.indices, P.indptr, q,
-                          A.data, A.indices, A.indptr,
-                          l, u, int_idx, **settings)
+        if p == 0:
+            self._model = _osqppurepy.OSQP()
+            self._model.setup((n, m), P.data, P.indices, P.indptr, q,
+                              A.data, A.indices, A.indptr,
+                              l, u, **settings)
+        else:
+            self._model = _miosqppurepy.MIOSQP()
+            self._model.setup((n, m, p), P.data, P.indices, P.indptr, q,
+                              A.data, A.indices, A.indptr,
+                              l, u, int_idx, **settings)
 
     def update(self, **kwargs):
         """
