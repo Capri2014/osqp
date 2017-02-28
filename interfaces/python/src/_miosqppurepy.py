@@ -12,20 +12,18 @@ import time   # Time execution
 import pdb   # Debugger
 
 # Solver Constants
-OSQP_SOLVED = 1
-OSQP_MAX_ITER_REACHED = -2
-OSQP_INFEASIBLE = -3
-OSQP_UNBOUNDED = -4
-OSQP_UNSOLVED = -10
+MIOSQP_SOLVED = 1
+MIOSQP_MAX_ITER_REACHED = -2
+MIOSQP_UNSOLVED = -10
 
 # Printing interval
 PRINT_INTERVAL = 100
 
 # OSQP Infinity
-OSQP_INFTY = 1e+20
+MIOSQP_INFTY = 1e+20
 
 # OSQP Nan
-OSQP_NAN = 1e+20  # Just as placeholder. Not real value
+MIOSQP_NAN = 1e+20  # Just as placeholder. Not real value
 
 
 class workspace(object):
@@ -93,7 +91,7 @@ class problem(object):
 
 class settings(object):
     """
-    OSQP solver settings
+    MIOSQP solver settings
 
     Attributes
     ----------
@@ -106,7 +104,8 @@ class settings(object):
 
     -> These can be changed without running setup
     max_iter [5000]            - Maximum number of iterations
-    eps_int  [1e-04]           - Integer infeasibility tolerance
+    eps_abs  [1e-04]           - Integer infeasibility tolerance
+    eps_rel  [1e-04]           - Integer infeasibility tolerance
     alpha [1.0]                - Relaxation parameter
     verbose  [True]            - Verbosity
     warm_start [False]         - Reuse solution from previous solve
@@ -121,7 +120,8 @@ class settings(object):
         self.scaling_norm = kwargs.pop('scaling_norm', 2)
 
         self.max_iter = kwargs.pop('max_iter', 5000)
-        self.eps_int = kwargs.pop('eps_abs', 1e-4)
+        self.eps_abs = kwargs.pop('eps_abs', 1e-4)
+        self.eps_rel = kwargs.pop('eps_rel', 1e-4)
         self.alpha = kwargs.pop('alpha', 1.6)
         self.verbose = kwargs.pop('verbose', True)
         self.warm_start = kwargs.pop('warm_start', False)
@@ -171,7 +171,7 @@ class info(object):
     """
     def __init__(self):
         self.iter = 0
-        self.status_val = OSQP_UNSOLVED
+        self.status_val = MIOSQP_UNSOLVED
 
 class priv(object):
     """
@@ -307,12 +307,10 @@ class MIOSQP(object):
         print("   University of Oxford  -  Stanford University 2016")
         print("-------------------------------------------------------")
 
-        print("Problem:  variables n = %d, constraints m = %d" % \
-            (data.n, data.m))
+        print("Problem:  variables n = %d, constraints m = %d, integers p = %d" % \
+            (data.n, data.m, data.p))
         print("Settings: eps_abs = %.2e, eps_rel = %.2e," % \
             (settings.eps_abs, settings.eps_rel))
-        print("          eps_inf = %.2e, eps_unb = %.2e," % \
-            (settings.eps_inf, settings.eps_unb))
         print("          rho = %.2f, sigma = %.2f, alpha = %.2f," % \
             (settings.rho, settings.sigma, settings.alpha))
         print("          max_iter = %d" % settings.max_iter)
@@ -330,18 +328,14 @@ class MIOSQP(object):
         """
         Print header before the iterations
         """
-        print("Iter    Obj  Val     Pri  Res     Dua  Res       Time")
+        print("Iter    Obj  Val     Pri  Res       Time")
 
     def update_status_string(self, status):
-        if status == OSQP_SOLVED:
+        if status == MIOSQP_SOLVED:
             return "Solved"
-        elif status == OSQP_INFEASIBLE:
-            return "Infeasible"
-        elif status == OSQP_UNSOLVED:
+        if status == MIOSQP_UNSOLVED:
             return "Unsolved"
-        elif status == OSQP_UNBOUNDED:
-            return "Unbounded"
-        elif status == OSQP_MAX_ITER_REACHED:
+        elif status == MIOSQP_MAX_ITER_REACHED:
             return "Maximum Iterations Reached"
 
     def cold_start(self):
@@ -410,151 +404,21 @@ class MIOSQP(object):
                 self.work.z)
         self.work.y += self.work.delta_y
 
-    def compute_pri_res(self, polish):
+    def compute_pri_res(self):
         """
         Compute primal residual ||Ax - z||
-        TODO: Add polishing case
         """
-        if self.work.data.m == 0:  # No constraints
-            return 0.
-        if polish:
-            return la.norm(np.maximum(self.work.data.l - self.work.pol.z, 0) +
-                           np.maximum(self.work.pol.z - self.work.data.u, 0))
-        else:
-            return la.norm(self.work.data.A.dot(self.work.x) - self.work.z)
+        return la.norm(self.work.data.A.dot(self.work.x) - self.work.z)
 
-    def compute_dua_res(self, polish):
-        """
-        Compute dual residual ||Px + q + A'y||
-        """
-        if polish:
-            return la.norm(self.work.data.P.dot(self.work.pol.x) +
-                           self.work.data.q +
-                           self.work.pol.Ared.T.dot(self.work.pol.y_red))
-        else:
-            return la.norm(self.work.data.P.dot(self.work.x) +
-                           self.work.data.q +
-                           self.work.data.A.T.dot(self.work.y))
 
-    def is_infeasible(self):
-        """
-        Check infeasibility
-                ||A'*v||_2 = 0
-        with v = delta_y/||delta_y||_2 given that following condition holds
-            u'*(v)_{+} + l'*(v)_{-} < 0
-        """
-
-        # # DEBUG
-        # if (self.work.info.iter % PRINT_INTERVAL == 0):
-        #     print "\n\nValues with r_pri"
-        #     r_pri = self.work.z - self.work.data.A.dot(self.work.x)
-        #
-        #     lhs = 0.
-        #     for i in range(self.work.data.m):
-        #         if self.work.data.u[i] < self.constant('OSQP_INFTY')*1e-03:
-        #             lhs += self.work.data.u[i] * max(r_pri[i], 0)
-        #
-        #         if self.work.data.l[i] > -self.constant('OSQP_INFTY')*1e-03:
-        #             lhs += self.work.data.l[i] * min(r_pri[i], 0)
-        #     # lhs = self.work.data.u.dot(np.maximum(r_pri, 0)) + \
-        #     #     self.work.data.l.dot(np.minimum(r_pri, 0))
-        #     print("u' * (v)_{+} + l' * v_{-} = %6.2e" % (lhs))
-        #     Atr_pri = self.work.data.A.T.dot(r_pri)
-        #     print("||A'*v|| = %6.2e" % (la.norm(Atr_pri)))
-        #
-
-            # lhsp = self.work.data.u.dot(np.maximum(self.work.delta_y, 0))
-            # lhsm = self.work.data.l.dot(np.minimum(self.work.delta_y, 0))
-            # print("Values with delta_y")
-            # lhs = 0.
-            # lhsp = 0.
-            # lhsm = 0.
-            # for i in range(self.work.data.m):
-            #     if self.work.data.u[i] < self.constant('OSQP_INFTY')*1e-05:
-            #         lhsp += self.work.data.u[i] * max(self.work.delta_y[i], 0)
-            #
-            #     if self.work.data.l[i] > -self.constant('OSQP_INFTY')*1e-03:
-            #         lhsm += self.work.data.l[i] * min(self.work.delta_y[i], 0)
-            # lhs = lhsp + lhsm
-            # print("u' * (v_{+}) = %6.2e" % lhsp)
-            # print("l' * (v_{-}) = %6.2e" % lhsm)
-            # print("u' * (v_{+}) + l' * (v_{-}) = %6.2e" % (lhs))
-            # self.work.Atdelta_y = self.work.data.A.T.dot(self.work.delta_y)
-            # print("||A'*v|| = %6.2e" % (la.norm(self.work.Atdelta_y)))
-            # pdb.set_trace()
-
-        eps_inf = self.work.settings.eps_inf
-        # Prevent 0 division
-        if la.norm(self.work.delta_y) > eps_inf*eps_inf:
-            self.work.delta_y /= la.norm(self.work.delta_y)
-            lhs = self.work.data.u.dot(np.maximum(self.work.delta_y, 0)) + \
-                self.work.data.l.dot(np.minimum(self.work.delta_y, 0))
-            if  lhs < -eps_inf:
-                self.work.Atdelta_y = self.work.data.A.T.dot(self.work.delta_y)
-                return la.norm(self.work.Atdelta_y) < eps_inf
-        return False
-
-    def is_unbounded(self):
-        """
-        Check unboundedness
-            ||P*v||_2 = 0
-        with v = delta_x / ||delta_x||_2 given that the following
-        conditions hold
-            q'* v < 0 and
-                        | 0     if l_i, u_i \in R
-            (A * v)_i = { >= 0  if u_i = +inf
-                        | <= 0  if l_i = -inf
-        """
-        eps_unb = self.work.settings.eps_unb
-        # Prevent 0 division
-        if la.norm(self.work.delta_x, np.inf) > eps_unb*eps_unb:
-            # Normalize delta_x
-            self.work.delta_x /= la.norm(self.work.delta_x)
-
-            # First check q'* v < 0
-            if self.work.data.q.dot(self.work.delta_x) < -eps_unb:
-
-                # Compute P * v
-                self.work.Pdelta_x = self.work.data.P.dot(self.work.delta_x)
-
-                # Check if ||P*v||_2 = 0
-                if la.norm(self.work.Pdelta_x) < eps_unb:
-
-                    # Compute A * v
-                    self.work.Adelta_x = self.work.data.A.dot(
-                        self.work.delta_x)
-
-                    for i in range(self.work.data.m):
-                        # De Morgan's Law applied to negate
-                        # conditions in sec 4.3
-                        if ((self.work.data.u[i] < OSQP_INFTY*1e-03) and
-                            (self.work.Adelta_x[i] > eps_unb)) or \
-                            ((self.work.data.l[i] > -OSQP_INFTY*1e-03) and
-                             (self.work.Adelta_x[i] < -eps_unb)):
-
-                            # At least one condition not satisfied
-                            return False
-
-                    # All conditions passed -> Unbounded
-                    return True
-
-        # No all checks managed to pass. Problem not unbounded
-        return False
-
-    def update_info(self, iter, polish):
+    def update_info(self, iter):
         """
         Update information at iterations
         """
-        if polish == 1:
-            self.work.pol.obj_val = self.work.data.objval(self.work.pol.x)
-            self.work.pol.pri_res = self.compute_pri_res(1)
-            self.work.pol.dua_res = self.compute_dua_res(1)
-        else:
-            self.work.info.iter = iter
-            self.work.info.obj_val = self.work.data.objval(self.work.x)
-            self.work.info.pri_res = self.compute_pri_res(0)
-            self.work.info.dua_res = self.compute_dua_res(0)
-            self.work.info.solve_time = time.time() - self.work.timer
+        self.work.info.iter = iter
+        self.work.info.obj_val = self.work.data.objval(self.work.x)
+        self.work.info.pri_res = self.compute_pri_res()
+        self.work.info.solve_time = time.time() - self.work.timer
 
     def print_summary(self):
         """
@@ -564,66 +428,8 @@ class MIOSQP(object):
             (self.work.info.iter,
              self.work.info.obj_val,
              self.work.info.pri_res,
-             self.work.info.dua_res,
              self.work.info.setup_time + self.work.info.solve_time))
 
-    def print_polishing(self):
-        """
-        Print polishing information
-        """
-        print("PLSH %12.4e %12.4e %12.4e %9.2fs" % \
-            (self.work.info.obj_val,
-             self.work.info.pri_res,
-             self.work.info.dua_res,
-             self.work.info.setup_time + self.work.info.solve_time +
-             self.work.info.polish_time))
-
-    def check_termination(self):
-        """
-        Check residuals for algorithm convergence and update solver status
-        """
-        pri_check = 0
-        dua_check = 0
-        inf_check = 0
-        unb_check = 0
-
-        if self.work.data.m == 0:  # No constraints -> always  primal feasible
-            pri_check = 1
-        else:
-            # Compute primal tolerance
-            eps_pri = np.sqrt(self.work.data.m) * self.work.settings.eps_abs +\
-                self.work.settings.eps_rel * la.norm(self.work.z)
-            # print "eps_pri = %.4e, pri_res = %.4e" % \
-            # (eps_pri, self.work.info.pri_res)
-            # set_trace()
-            if self.work.info.pri_res < eps_pri:
-                pri_check = 1
-
-            # Check infeasibility
-            inf_check = self.is_infeasible()
-
-        # Compute dual tolerance
-        eps_dua = np.sqrt(self.work.data.n) * self.work.settings.eps_abs + \
-            self.work.settings.eps_rel * self.work.settings.rho * \
-            la.norm(self.work.data.A.T.dot(self.work.y))
-        if self.work.info.dua_res < eps_dua:
-            dua_check = 1
-
-        # Check unboundedness
-        unb_check = self.is_unbounded()
-
-        # Compare residuals and determine solver status
-        if pri_check & dua_check:
-            self.work.info.status_val = OSQP_SOLVED
-            return 1
-        elif inf_check:
-            self.work.info.status_val = OSQP_INFEASIBLE
-            self.work.info.obj_val = OSQP_INFTY
-            return 1
-        elif unb_check:
-            self.work.info.status_val = OSQP_UNBOUNDED
-            self.work.info.obj_val = -OSQP_INFTY
-            return 1
 
     def print_footer(self):
         """
@@ -631,14 +437,8 @@ class MIOSQP(object):
         """
         print("")  # Add space after iterations
         print("Status: %s" % self.work.info.status)
-        if self.work.settings.polishing and \
-                self.work.info.status_val == OSQP_SOLVED:
-                    if self.work.info.status_polish == 1:
-                        print("Solution polishing: Successful")
-                    elif self.work.info.status_polish == -1:
-                        print("Solution polishing: Unsuccessful")
         print("Number of iterations: %d" % self.work.info.iter)
-        if self.work.info.status_val == OSQP_SOLVED:
+        if self.work.info.status_val == MIOSQP_SOLVED:
             print("Optimal objective: %.4f" % self.work.info.obj_val)
         if self.work.info.run_time > 1e-03:
             print("Run time: %.3fs" % (self.work.info.run_time))
@@ -653,8 +453,8 @@ class MIOSQP(object):
         Store current primal and dual solution in solution structure
         """
 
-        if (self.work.info.status_val is not OSQP_INFEASIBLE) and \
-                (self.work.info.status_val is not OSQP_UNBOUNDED):
+        if (self.work.info.status_val is not MIOSQP_INFEASIBLE) and \
+                (self.work.info.status_val is not MIOSQP_UNBOUNDED):
             self.work.solution.x = self.work.x
             self.work.solution.y = self.work.y
 
@@ -672,25 +472,25 @@ class MIOSQP(object):
     #   Main Solver API
     #
 
-    def setup(self, xxx_todo_changeme1, Pdata, Pindices, Pindptr, q,
+    def setup(self, dims, Pdata, Pindices, Pindptr, q,
               Adata, Aindices, Aindptr,
-              l, u, **stgs):
+              l, u, int_idx, **stgs):
         """
         Perform OSQP solver setup QP problem of the form
             minimize	1/2 x' P x + q' x
             subject to	l <= A x <= u
 
         """
-        (n, m) = xxx_todo_changeme1
+        (n, m, p) = dims
         self.work = workspace()
 
         # Start timer
         self.work.timer = time.time()
 
         # Unscaled problem data
-        self.work.data = problem((n, m), Pdata, Pindices, Pindptr, q,
+        self.work.data = problem((n, m, p), Pdata, Pindices, Pindptr, q,
                                  Adata, Aindices, Aindptr,
-                                 l, u)
+                                 l, u, int_idx)
 
         # Initialize workspace variables
         self.work.x = np.zeros(n)
@@ -699,7 +499,6 @@ class MIOSQP(object):
         self.work.x_prev = np.zeros(n)
         self.work.z_prev = np.zeros(m)
         self.work.y = np.zeros(m)
-        self.work.delta_y = np.zeros(m)       # Delta_y for infeasibility
 
         # Flag indicating first run
         self.work.first_run = 1
@@ -720,9 +519,6 @@ class MIOSQP(object):
         # Info
         self.work.info = info()
 
-        # Polishing structure
-        self.work.pol = pol()
-
         # End timer
         self.work.info.setup_time = time.time() - self.work.timer
 
@@ -732,7 +528,7 @@ class MIOSQP(object):
 
     def solve(self):
         """
-        Solve QP problem using OSQP
+        Solve MIQP problem using ADMM Heuristic
         """
         # Start timer
         self.work.timer = time.time()
@@ -762,52 +558,40 @@ class MIOSQP(object):
             # Third step: update y
             self.update_y()
 
+
+
+            # Check if obtained new solution!
+
+
             # Update info
-            self.update_info(iter, 0)
+            self.update_info(iter)
 
             # Print summary
             if (self.work.settings.verbose) & \
                     ((iter % PRINT_INTERVAL == 0) | (iter == 1)):
                 self.print_summary()
 
-            # Break if converged
-            if self.check_termination():
-                break
+
 
         # Print summary for last iteration
         if (self.work.settings.verbose) & (iter % PRINT_INTERVAL != 0):
             self.print_summary()
 
-        # If max iterations reached, update status accordingly
-        if iter == self.work.settings.max_iter:
-            self.work.info.status_val = OSQP_MAX_ITER_REACHED
-
-        # Update status string
-        self.work.info.status = \
-            self.update_status_string(self.work.info.status_val)
 
         # Update solve time
         self.work.info.solve_time = time.time() - self.work.timer
 
-        # Solution polishing
-        if self.work.settings.polishing and \
-                self.work.info.status_val == OSQP_SOLVED:
-                    self.polish()
 
         # Update total times
         if self.work.first_run:
             self.work.info.run_time = self.work.info.setup_time + \
-                self.work.info.solve_time + self.work.info.polish_time
+                self.work.info.solve_time
         else:
-            self.work.info.run_time = self.work.info.solve_time + \
-                                      self.work.info.polish_time
+            self.work.info.run_time = self.work.info.solve_time
 
         # Print footer
         if self.work.settings.verbose:
             self.print_footer()
-
-        # Store solution
-        self.store_solution()
 
         # Eliminate first run flag
         if self.work.first_run:
@@ -988,25 +772,6 @@ class MIOSQP(object):
 
         self.work.settings.delta = delta_new
 
-    def update_polishing(self, polishing_new):
-        """
-        Update polishing parameter
-        """
-        if (polishing_new is not True) & (polishing_new is not False):
-            raise ValueError("polishing should be either True or False")
-
-        self.work.settings.polishing = polishing_new
-        self.work.info.polish_time = 0.0
-
-    def update_pol_refine_iter(self, pol_refine_iter_new):
-        """
-        Update number iterative refinement iterations in polishing
-        """
-        if pol_refine_iter_new < 0:
-            raise ValueError("pol_refine_iter must be nonnegative")
-
-        self.work.settings.pol_refine_iter = pol_refine_iter_new
-
     def update_verbose(self, verbose_new):
         """
         Update verbose parameter
@@ -1029,20 +794,16 @@ class MIOSQP(object):
         """
         Return solver constant
         """
-        if constant_name == "OSQP_INFTY":
-            return OSQP_INFTY
-        if constant_name == "OSQP_NAN":
-            return OSQP_NAN
-        if constant_name == "OSQP_SOLVED":
-            return OSQP_SOLVED
-        if constant_name == "OSQP_UNSOLVED":
-            return OSQP_UNSOLVED
-        if constant_name == "OSQP_INFEASIBLE":
-            return OSQP_INFEASIBLE
-        if constant_name == "OSQP_UNBOUNDED":
-            return OSQP_UNBOUNDED
-        if constant_name == "OSQP_MAX_ITER_REACHED":
-            return OSQP_MAX_ITER_REACHED
+        if constant_name == "MIOSQP_INFTY":
+            return MIOSQP_INFTY
+        if constant_name == "MIOSQP_NAN":
+            return MIOSQP_NAN
+        if constant_name == "MIOSQP_SOLVED":
+            return MIOSQP_SOLVED
+        if constant_name == "MIOSQP_UNSOLVED":
+            return MIOSQP_UNSOLVED
+        if constant_name == "MIOSQP_MAX_ITER_REACHED":
+            return MIOSQP_MAX_ITER_REACHED
 
         raise ValueError('Constant not recognized!')
 
