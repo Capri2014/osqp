@@ -15,14 +15,16 @@ class OSQP(object):
     def version(self):
         return self._model.version()
 
-    def setup(self, P=None, q=None, A=None, l=None, u=None, **settings):
+    def setup(self, P=None, q=None, A=None, l=None, u=None,
+              int_idx=None, **settings):
         """
         Setup OSQP solver problem of the form
 
-        minimize     1/2 x' * P * x + q' * x
-        subject to   l <= A * x <= u
+        minimize    1/2 x' * P * x + q' * x
+        subject to  l <= A * x <= u
+                    x_i \in Z for i in int_idx
 
-        solver settings can be specified as additional keyword arguments
+        solver settings can be specified as additional keyword arguments.
         """
 
         # Get problem dimensions
@@ -39,6 +41,15 @@ class OSQP(object):
             m = 0
         else:
             m = A.shape[0]
+
+
+        # check if number of integer variables less than the size of variables
+        p = 0
+        if int_idx is not None
+            if len(int_idx) > n:
+                raise ValueError("Dimension of int_idx larger than n")
+            else:
+                p = len(int_idx)  # Number of integer variables
 
         # Check if second dimension of A is correct
         if A.shape[1] != n:
