@@ -20,7 +20,7 @@ class warm_start_tests(unittest.TestCase):
                      'eps_rel': 1e-05,
                      'rho': 0.05,
                      'sigma': 0.01,
-                     'polishing': False,
+                     'polish': False,
                      'pol_refine_iter': 4}
 
     def test_warm_start(self):
@@ -45,7 +45,7 @@ class warm_start_tests(unittest.TestCase):
         # Solve problem with OSQP
         res = self.model.solve()
 
-        # Store optimal values\
+        # Store optimal values
         x_opt = res.x
         y_opt = res.y
         tot_iter = res.info.iter

@@ -157,7 +157,7 @@ c_int permute_KKT(csc ** KKT, Priv * p, c_int Pnz, c_int Anz, c_int * PtoKKT, c_
  * @param  P        Cost function matrix (upper triangular form)
  * @param  A        Constraints matrix
  * @param  settings Solver settings
- * @param  polish   Flag whether we are initializing for polishing or not
+ * @param  polish   Flag whether we are initializing for polish or not
  * @return          Initialized private structure
  */
 Priv *init_priv(const csc * P, const csc * A, const OSQPSettings *settings, c_int polish){
@@ -290,6 +290,9 @@ c_int update_priv(Priv * p, const csc *P, const csc *A,
                      p->L->p, p->Parent, p->Lnz, p->L->i,
                      p->L->x, p->Dinv, p->Y, p->Pattern, p->Flag,
                      OSQP_NULL, OSQP_NULL);
+
+     // Invert elements of D that are stored in p->Dinv
+     vec_ew_recipr(p->Dinv, p->Dinv, p->KKT->n);
 
     // return exit flag
     return (kk - p->KKT->n);

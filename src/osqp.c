@@ -230,27 +230,43 @@ c_int osqp_solve(OSQPWorkspace * work){
         /* End of ADMM Steps */
 
 
+        if (work->settings->early_terminate) {
+            /* Update information */
+            update_info(work, iter, 0);
+
+            /* Print summary */
+            #ifdef PRINTING
+            if (work->settings->verbose &&
+                    ((iter % PRINT_INTERVAL == 0)||(iter == 1)))
+                print_summary(work->info);
+            #endif
+
+            if (check_termination(work)){
+                // Terminate algorithm
+                break;
+            }
+        }
+    }
+
+    if (!work->settings->early_terminate) {
         /* Update information */
-        update_info(work, iter, 0);
+        update_info(work, iter-1, 0);
 
         /* Print summary */
         #ifdef PRINTING
-        if (work->settings->verbose &&
-                ((iter % PRINT_INTERVAL == 0)||(iter == 1)))
+        if (work->settings->verbose)
             print_summary(work->info);
         #endif
 
-        if (check_termination(work)){
-            // Terminate algorithm
-            break;
-        }
-
+        /* Check whether a termination criterion is triggered */
+        check_termination(work);
     }
-
 
     /* Print summary for last iteration */
     #ifdef PRINTING
-    if (work->settings->verbose && iter % PRINT_INTERVAL != 0 && iter != 1)
+    if (work->settings->verbose
+        && iter % PRINT_INTERVAL != 0 && iter != 1
+        && iter != work->settings->max_iter + 1)
         print_summary(work->info);
     #endif
 
@@ -266,7 +282,7 @@ c_int osqp_solve(OSQPWorkspace * work){
 
     // Polish the obtained solution
     #ifndef EMBEDDED
-    if (work->settings->polishing && work->info->status_val == OSQP_SOLVED)
+    if (work->settings->polish && work->info->status_val == OSQP_SOLVED)
         polish(work);
     #endif
 
@@ -287,7 +303,7 @@ c_int osqp_solve(OSQPWorkspace * work){
     /* Print final footer */
     #ifdef PRINTING
     if(work->settings->verbose)
-        print_footer(work->info, work->settings->polishing);
+        print_footer(work->info, work->settings->polish);
     #endif
 
     // Store solution
@@ -960,11 +976,31 @@ c_int osqp_update_warm_start(OSQPWorkspace * work, c_int warm_start_new) {
     return 0;
 }
 
+/**
+ * Update early_terminate setting
+ * @param  work                 Workspace
+ * @param  early_terminate_new  New early_terminate setting
+ * @return                      Exitflag
+ */
+c_int osqp_update_early_terminate(OSQPWorkspace * work, c_int early_terminate_new) {
+    // Check that early_terminate is either 0 or 1
+    if (early_terminate_new != 0 && early_terminate_new != 1) {
+      #ifdef PRINTING
+      c_print("early_terminate should be either 0 or 1\n");
+      #endif
+      return 1;
+    }
+    // Update early_terminate
+    work->settings->early_terminate = early_terminate_new;
+
+    return 0;
+}
+
 
 #ifndef EMBEDDED
 
 /**
- * Update regularization parameter in polishing
+ * Update regularization parameter in polish
  * @param  work      Workspace
  * @param  delta_new New regularization parameter
  * @return           Exitflag
@@ -984,21 +1020,21 @@ c_int osqp_update_delta(OSQPWorkspace * work, c_float delta_new) {
 }
 
 /**
- * Update polishing setting
+ * Update polish setting
  * @param  work          Workspace
- * @param  polishing_new New polishing setting
+ * @param  polish_new New polish setting
  * @return               Exitflag
  */
-c_int osqp_update_polishing(OSQPWorkspace * work, c_int polishing_new) {
-    // Check that polishing is either 0 or 1
-    if (polishing_new != 0 && polishing_new != 1) {
+c_int osqp_update_polish(OSQPWorkspace * work, c_int polish_new) {
+    // Check that polish is either 0 or 1
+    if (polish_new != 0 && polish_new != 1) {
       #ifdef PRINTING
-      c_print("polishing should be either 0 or 1\n");
+      c_print("polish should be either 0 or 1\n");
       #endif
       return 1;
     }
-    // Update polishing
-    work->settings->polishing = polishing_new;
+    // Update polish
+    work->settings->polish = polish_new;
 
     #ifdef PROFILING
     // Reset polish time to zero
@@ -1010,7 +1046,7 @@ c_int osqp_update_polishing(OSQPWorkspace * work, c_int polishing_new) {
 
 
 /**
- * Update number of iterative refinement steps in polishing
+ * Update number of iterative refinement steps in polish
  * @param  work                Workspace
  * @param  pol_refine_iter_new New iterative reginement steps
  * @return                     Exitflag

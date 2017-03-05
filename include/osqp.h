@@ -244,11 +244,19 @@ c_int osqp_update_alpha(OSQPWorkspace * work, c_float alpha_new);
 c_int osqp_update_warm_start(OSQPWorkspace * work, c_int warm_start_new);
 
 
+/**
+ * Update early_terminate setting
+ * @param  work                 Workspace
+ * @param  early_terminate_new  New early_terminate setting
+ * @return                      Exitflag
+ */
+c_int osqp_update_early_terminate(OSQPWorkspace * work, c_int early_terminate_new);
+
+
 #ifndef EMBEDDED
 
-
 /**
- * Update regularization parameter in polishing
+ * Update regularization parameter in polish
  * @param  work      Workspace
  * @param  delta_new New regularization parameter
  * @return           Exitflag
@@ -257,16 +265,16 @@ c_int osqp_update_delta(OSQPWorkspace * work, c_float delta_new);
 
 
 /**
- * Update polishing setting
+ * Update polish setting
  * @param  work          Workspace
- * @param  polishing_new New polishing setting
+ * @param  polish_new New polish setting
  * @return               Exitflag
  */
-c_int osqp_update_polishing(OSQPWorkspace * work, c_int polishing_new);
+c_int osqp_update_polish(OSQPWorkspace * work, c_int polish_new);
 
 
 /**
- * Update number of iterative refinement steps in polishing
+ * Update number of iterative refinement steps in polish
  * @param  work                Workspace
  * @param  pol_refine_iter_new New iterative reginement steps
  * @return                     Exitflag

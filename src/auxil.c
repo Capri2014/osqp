@@ -329,7 +329,7 @@ void store_solution(OSQPWorkspace *work) {
  * @param polish Called from polish function (1) or from elsewhere (0)
  */
 void update_info(OSQPWorkspace *work, c_int iter, c_int polish){
-    if (polish) { // polishing
+    if (polish) { // polish
 
         work->pol->obj_val = compute_obj_val(work->data, work->pol->x);
         if (work->data->m == 0) {
@@ -585,6 +585,12 @@ c_int validate_settings(const OSQPSettings * settings){
     if (settings->verbose != 0 && settings->verbose != 1) {
         #ifdef PRINTING
         c_print("verbose must be either 0 or 1\n");
+        #endif
+        return 1;
+    }
+    if (settings->early_terminate != 0 && settings->early_terminate != 1) {
+        #ifdef PRINTING
+        c_print("early_terminate must be either 0 or 1\n");
         #endif
         return 1;
     }

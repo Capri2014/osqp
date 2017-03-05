@@ -25,7 +25,7 @@ class unboundedness_tests(unittest.TestCase):
                      'rho': 1.6,
                      'alpha': 1.6,
                      'max_iter': 2500,
-                     'polishing': False,
+                     'polish': False,
                      'pol_refine_iter': 4}
 
     def test_unbounded_lp(self):
@@ -45,7 +45,8 @@ class unboundedness_tests(unittest.TestCase):
         res = self.model.solve()
 
         # Assert close
-        self.assertEqual(res.info.status_val, -4)
+        self.assertEqual(res.info.status_val,
+                         self.model.constant('OSQP_UNBOUNDED'))
 
     def test_unbounded_qp(self):
 

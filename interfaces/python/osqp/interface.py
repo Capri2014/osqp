@@ -3,10 +3,11 @@ Python interface module for OSQP solver v0.0.0
 """
 
 from builtins import object
-import _osqp  # Internal low level module
+import osqp._osqp  as _osqp # Internal low level module
 from warnings import warn
 import numpy as np
 from scipy import sparse
+
 
 class OSQP(object):
     def __init__(self):
@@ -113,7 +114,6 @@ class OSQP(object):
         u = np.minimum(u, self._model.constant('OSQP_INFTY'))
         l = np.maximum(l, -self._model.constant('OSQP_INFTY'))
 
-
         self._model.setup((n, m), P.data, P.indices, P.indptr, q,
                           A.data, A.indices, A.indptr,
                           l, u, **settings)
@@ -148,7 +148,6 @@ class OSQP(object):
             if u is None:
                 self._model.update_lower_bound(l)
 
-
         if u is not None:
             if len(u) != m:
                 raise ValueError("u must have length m")
@@ -162,14 +161,13 @@ class OSQP(object):
         if l is not None and u is not None:
             self._model.update_bounds(l, u)
 
-
     def update_settings(self, **kwargs):
         """
         Update OSQP solver settings
 
         It is possible to change: 'max_iter', 'eps_abs', 'eps_rel', 'alpha',
-                                  'delta', 'polishing', 'pol_refine_iter',
-                                  'verbose'
+                                  'delta', 'polish', 'pol_refine_iter',
+                                  'verbose', 'early_terminate'
         """
 
         # get arguments
@@ -178,9 +176,10 @@ class OSQP(object):
         eps_rel = kwargs.pop('eps_rel', None)
         alpha = kwargs.pop('alpha', None)
         delta = kwargs.pop('delta', None)
-        polishing = kwargs.pop('polishing', None)
+        polish = kwargs.pop('polish', None)
         pol_refine_iter = kwargs.pop('pol_refine_iter', None)
         verbose = kwargs.pop('verbose', None)
+        early_terminate = kwargs.pop('early_terminate', None)
         warm_start = kwargs.pop('warm_start', None)
 
         # update them
@@ -199,14 +198,17 @@ class OSQP(object):
         if delta is not None:
             self._model.update_delta(delta)
 
-        if polishing is not None:
-            self._model.update_polishing(polishing)
+        if polish is not None:
+            self._model.update_polish(polish)
 
         if pol_refine_iter is not None:
             self._model.update_pol_refine_iter(pol_refine_iter)
 
         if verbose is not None:
             self._model.update_verbose(verbose)
+
+        if early_terminate is not None:
+            self._model.update_early_terminate(early_terminate)
 
         if warm_start is not None:
             self._model.update_warm_start(warm_start)
@@ -216,9 +218,10 @@ class OSQP(object):
            eps_rel is None and \
            alpha is None and \
            delta is None and \
-           polishing is None and \
+           polish is None and \
            pol_refine_iter is None and \
            verbose is None and \
+           early_terminate is None and \
            warm_start is None:
             ValueError("No updatable settings has been specified!")
 
@@ -261,3 +264,17 @@ class OSQP(object):
 
         if x is None and y is None:
             raise ValueError("Unrecognized fields")
+
+    def codegen(self, folder, project_type, embedded_flag):
+        """
+        Generate embeddable C code for the problem
+        """
+
+        print("Hello!")
+        # Convert workspace to python
+
+
+        # Generate C code
+        # ...
+
+        # Call

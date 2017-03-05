@@ -1,445 +1,3 @@
-// Use not deprecated Numpy API (numpy > 1.7)
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-
-#include "Python.h"                // Python API
-#include "structmember.h"          // Python members structure (to store results)
-#include "numpy/arrayobject.h"     // Numpy C API
-#include "numpy/npy_math.h"        // For infinity values
-#include "osqp.h"                  // OSQP API
-
-
-/* The PyInt variable is a PyLong in Python3.x.
- */
-#if PY_MAJOR_VERSION >= 3
-#define PyInt_AsLong PyLong_AsLong
-#define PyInt_Check PyLong_Check
-#endif
-
-
-/****************************************
- * Utilities for Main API Functions     *
- ****************************************/
-
-
-/* OSQP Problem data in Python arrays */
-typedef struct {
-    c_int          n;
-    c_int          m;
-    PyArrayObject *Px;
-    PyArrayObject *Pi;
-    PyArrayObject *Pp;
-    PyArrayObject *q;
-    PyArrayObject *Ax;
-    PyArrayObject *Ai;
-    PyArrayObject *Ap;
-    PyArrayObject *l;
-    PyArrayObject *u;
-} PyOSQPData;
-
-// Get integer type from OSQP setup
-static int get_int_type(void) {
-    switch (sizeof(c_int)) {
-    case 1:
-        return NPY_INT8;
-    case 2:
-        return NPY_INT16;
-    case 4:
-        return NPY_INT32;
-    case 8:
-        return NPY_INT64;
-    default:
-        return NPY_INT32; /* defaults to 4 byte int */
-    }
-}
-
-// Get float type from OSQP setup
-static int get_float_type(void) {
-    switch (sizeof(c_float)) {
-    case 2:
-        return NPY_FLOAT16;
-    case 4:
-        return NPY_FLOAT32;
-    case 8:
-        return NPY_FLOAT64;
-    default:
-        return NPY_FLOAT64; /* defaults to double */
-    }
-}
-
-/* gets the pointer to the block of contiguous C memory
- * the overhead should be small unless the numpy array has been
- * reordered in some way or the data type doesn't quite match
- */
-static PyArrayObject *get_contiguous(PyArrayObject *array, int typenum) {
-        /*
-        * the "tmp_arr" pointer has to have Py_DECREF called on it; new_owner
-        * owns the "new" array object created by PyArray_Cast
-        */
-        PyArrayObject *tmp_arr;
-        PyArrayObject *new_owner;
-        tmp_arr = PyArray_GETCONTIGUOUS(array);
-        new_owner = (PyArrayObject *) PyArray_Cast(tmp_arr, typenum);
-        Py_DECREF(tmp_arr);
-        return new_owner;
-}
-
-
-static PyOSQPData * create_pydata(c_int n, c_int m,
-                     PyArrayObject *Px, PyArrayObject *Pi, PyArrayObject *Pp,
-                     PyArrayObject *q, PyArrayObject *Ax, PyArrayObject *Ai,
-                     PyArrayObject *Ap, PyArrayObject *l, PyArrayObject *u){
-
-        // Get int and float types
-        int int_type = get_int_type();
-        int float_type = get_float_type();
-
-        // Populate PyOSQPData structure
-        PyOSQPData * py_d = (PyOSQPData *)c_malloc(sizeof(PyOSQPData));
-        py_d->n = n;
-        py_d->m = m;
-        py_d->Px = get_contiguous(Px, float_type);
-        py_d->Pi = get_contiguous(Pi, int_type);
-        py_d->Pp = get_contiguous(Pp, int_type);
-        py_d->q  = get_contiguous(q, float_type);
-        py_d->Ax = get_contiguous(Ax, float_type);
-        py_d->Ai = get_contiguous(Ai, int_type);
-        py_d->Ap = get_contiguous(Ap, int_type);
-        py_d->l = get_contiguous(l, float_type);
-        py_d->u = get_contiguous(u, float_type);
-
-        // Retrun
-        return py_d;
-
-}
-
-// Create data structure from arrays
-static OSQPData * create_data(PyOSQPData * py_d){
-
-        // Allocate OSQPData structure
-        OSQPData * data = (OSQPData *)c_malloc(sizeof(OSQPData));
-
-        // Populate OSQPData structure
-        data->n = py_d->n;
-        data->m = py_d->m;
-        data->P = csc_matrix(data->n, data->n,
-                             PyArray_DIM(py_d->Px, 0),  // nnz
-                             (c_float *)PyArray_DATA(py_d->Px),
-                             (c_int *)PyArray_DATA(py_d->Pi),
-                             (c_int *)PyArray_DATA(py_d->Pp));
-        data->q = (c_float *)PyArray_DATA(py_d->q);
-        data->A = csc_matrix(data->m, data->n,
-                             PyArray_DIM(py_d->Ax, 0),  // nnz
-                             (c_float *)PyArray_DATA(py_d->Ax),
-                             (c_int *)PyArray_DATA(py_d->Ai),
-                             (c_int *)PyArray_DATA(py_d->Ap));
-        data->l = (c_float *)PyArray_DATA(py_d->l);
-        data->u = (c_float *)PyArray_DATA(py_d->u);
-
-        return data;
-}
-
-
-static c_int free_data(OSQPData *data, PyOSQPData * py_d){
-
-    // Clean contiguous PyArrayObjects
-    Py_DECREF(py_d->Px);
-    Py_DECREF(py_d->Pi);
-    Py_DECREF(py_d->Pp);
-    Py_DECREF(py_d->q);
-    Py_DECREF(py_d->Ax);
-    Py_DECREF(py_d->Ai);
-    Py_DECREF(py_d->Ap);
-    Py_DECREF(py_d->l);
-    Py_DECREF(py_d->u);
-    c_free(py_d);
-
-    // Clean data structure
-    if (data){
-        if (data->P){
-            c_free(data->P);
-        }
-
-        if (data->A){
-            c_free(data->A);
-        }
-
-        c_free(data);
-        return 0;
-    }
-    else{
-        return 1;
-    }
-
-}
-
-/*******************************************
- * INFO Object definition and methods   *
- *******************************************/
-
- typedef struct {
-    PyObject_HEAD
-    c_int iter;                /* number of iterations taken */
-    PyUnicodeObject * status;  /* status unicode string, e.g. 'Solved' */
-    c_int status_val;          /* status as c_int, defined in constants.h */
-    c_int status_polish;       /* polish status: successful (1), not (0) */
-    c_float obj_val;           /* primal objective */
-    c_float pri_res;           /* norm of primal residual */
-    c_float dua_res;           /* norm of dual residual */
-
-    #ifdef PROFILING
-    c_float setup_time;        /* time taken for setup phase (milliseconds) */
-    c_float solve_time;        /* time taken for solve phase (milliseconds) */
-    c_float polish_time;       /* time taken for polish phase (milliseconds) */
-    c_float run_time;          /* total time taken (milliseconds) */
-    #endif
-
-} OSQP_info;
-
-
-static PyMemberDef OSQP_info_members[] = {
-    {"iter", T_INT, offsetof(OSQP_info, iter), READONLY, "Primal solution"},
-    {"status", T_OBJECT, offsetof(OSQP_info, status), READONLY, "Solver status"},
-    {"status_val", T_INT, offsetof(OSQP_info, status_val), READONLY, "Solver status value"},
-    {"status_polish", T_INT, offsetof(OSQP_info, status_polish), READONLY, "Polishing status value"},
-    {"obj_val", T_DOUBLE, offsetof(OSQP_info, obj_val), READONLY, "Objective value"},
-    {"pri_res", T_DOUBLE, offsetof(OSQP_info, pri_res), READONLY, "Primal residual"},
-    {"dua_res", T_DOUBLE, offsetof(OSQP_info, dua_res), READONLY, "Dual residual"},
-    #ifdef PROFILING
-    {"setup_time", T_DOUBLE, offsetof(OSQP_info, setup_time), READONLY, "Setup time"},
-    {"solve_time", T_DOUBLE, offsetof(OSQP_info, solve_time), READONLY, "Solve time"},
-    {"polish_time", T_DOUBLE, offsetof(OSQP_info, polish_time), READONLY, "Polish time"},
-    {"run_time", T_DOUBLE, offsetof(OSQP_info, run_time), READONLY, "Total run time"},
-    #endif
-    {NULL}
-};
-
-
-// Initialize results structure assigning arguments
-static c_int OSQP_info_init( OSQP_info * self, PyObject *args)
-{
-    #ifdef PROFILING
-
-    #ifdef DLONG
-
-    #ifdef DFLOAT
-    static char * argparse_string = "lUllfffffff";
-    #else
-    static char * argparse_string = "lUllddddddd";
-    #endif
-
-    #else
-
-    #ifdef DFLOAT
-    static char * argparse_string = "iUiifffffff";
-    #else
-    static char * argparse_string = "iUiiddddddd";
-    #endif
-
-    #endif
-    // Parse argumentrs
-    if( !PyArg_ParseTuple(args, argparse_string,
-                          &(self->iter),
-                          &(self->status),
-                          &(self->status_val),
-                          &(self->status_polish),
-                          &(self->obj_val),
-                          &(self->pri_res),
-                          &(self->dua_res),
-                          &(self->setup_time),
-                          &(self->solve_time),
-                          &(self->polish_time),
-                          &(self->run_time))) {
-            return -1;
-    }
-    #else
-
-    #ifdef DLONG
-
-    #ifdef DFLOAT
-    static char * argparse_string = "lUllfff";
-    #else
-    static char * argparse_string = "lUllddd";
-    #endif
-
-    #else
-
-    #ifdef DFLOAT
-    static char * argparse_string = "iUiifff";
-    #else
-    static char * argparse_string = "iUiiddd";
-    #endif
-
-    #endif
-
-    // Parse argumentrs
-    if( !PyArg_ParseTuple(args, argparse_string,
-                          &(self->iter),
-                          &(self->status),
-                          &(self->status_val),
-                          &(self->status_polish),
-                          &(self->obj_val),
-                          &(self->pri_res),
-                          &(self->dua_res))) {
-            return -1;
-    }
-
-    #endif
-
-
-	return 0;
-}
-
-
-static c_int OSQP_info_dealloc(OSQP_info *self){
-
-    // Delete Python string status
-    Py_DECREF(self->status);
-
-    // Deallocate object
-    PyObject_Del(self);
-
-    return 0;
-}
-
-
-// Define info type object
-static PyTypeObject OSQP_info_Type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "osqp.OSQP_info",                       /* tp_name*/
-    sizeof(OSQP_info),                      /* tp_basicsize*/
-    0,                                         /* tp_itemsize*/
-    (destructor)OSQP_info_dealloc,          /* tp_dealloc*/
-    0,                                         /* tp_print*/
-    0,                                         /* tp_getattr*/
-    0,                                         /* tp_setattr*/
-    0,                                         /* tp_compare*/
-    0,                                         /* tp_repr*/
-    0,                                         /* tp_as_number*/
-    0,                                         /* tp_as_sequence*/
-    0,                                         /* tp_as_mapping*/
-    0,                                         /* tp_hash */
-    0,                                         /* tp_call*/
-    0,                                         /* tp_str*/
-    0,                                         /* tp_getattro*/
-    0,                                         /* tp_setattro*/
-    0,                                         /* tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,                        /* tp_flags*/
-    "OSQP solver info",                     /* tp_doc */
-    0,		                                   /* tp_traverse */
-    0,		                                   /* tp_clear */
-    0,		                                   /* tp_richcompare */
-    0,		                                   /* tp_weaklistoffset */
-    0,		                                   /* tp_iter */
-    0,		                                   /* tp_iternext */
-    0,                                         /* tp_methods */
-    OSQP_info_members,                      /* tp_members */
-    0,                                         /* tp_getset */
-    0,                                         /* tp_base */
-    0,                                         /* tp_dict */
-    0,                                         /* tp_descr_get */
-    0,                                         /* tp_descr_set */
-    0,                                         /* tp_dictoffset */
-    (initproc)OSQP_info_init,               /* tp_init */
-    0,                                         /* tp_alloc */
-    0,                                         /* tp_new */
-};
-
-/*******************************************
- * RESULTS Object definition and methods   *
- *******************************************/
-
- typedef struct {
-    PyObject_HEAD
-    PyArrayObject * x;     // Primal solution
-    PyArrayObject * y;     // Dual solution
-    OSQP_info * info;      // Solver information
-} OSQP_results;
-
-static PyMemberDef OSQP_results_members[] = {
-    {"x", T_OBJECT, offsetof(OSQP_results, x), READONLY, "Primal solution"},
-    {"y", T_OBJECT, offsetof(OSQP_results, y), READONLY, "Dual solution"},
-    {"info", T_OBJECT, offsetof(OSQP_results, info), READONLY, "Solver Information"},
-    {NULL}
-};
-
-// Initialize results structure assigning arguments
-static c_int OSQP_results_init( OSQP_results * self, PyObject *args)
-{
-    static char * argparse_string = "O!O!O!";
-
-    // Parse argumentrs
-    if( !PyArg_ParseTuple(args, argparse_string,
-                          &PyArray_Type, &(self->x),
-                          &PyArray_Type, &(self->y),
-                          &OSQP_info_Type, &(self->info))) {
-            return -1;
-    }
-
-	return 0;
-}
-
-
-static c_int OSQP_results_dealloc(OSQP_results *self){
-
-    // Delete Python arrays
-    Py_DECREF(self->x);
-    Py_DECREF(self->y);
-
-    // Delete info object
-    Py_DECREF(self->info);
-
-    // Deallocate object
-    PyObject_Del(self);
-
-    return 0;
-}
-
-
-// Define results type object
-static PyTypeObject OSQP_results_Type = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "osqp.OSQP_results",                       /* tp_name*/
-    sizeof(OSQP_results),                      /* tp_basicsize*/
-    0,                                         /* tp_itemsize*/
-    (destructor)OSQP_results_dealloc,          /* tp_dealloc*/
-    0,                                         /* tp_print*/
-    0,                                         /* tp_getattr*/
-    0,                                         /* tp_setattr*/
-    0,                                         /* tp_compare*/
-    0,                                         /* tp_repr*/
-    0,                                         /* tp_as_number*/
-    0,                                         /* tp_as_sequence*/
-    0,                                         /* tp_as_mapping*/
-    0,                                         /* tp_hash */
-    0,                                         /* tp_call*/
-    0,                                         /* tp_str*/
-    0,                                         /* tp_getattro*/
-    0,                                         /* tp_setattro*/
-    0,                                         /* tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT,                        /* tp_flags*/
-    "OSQP solver results",                     /* tp_doc */
-    0,		                                   /* tp_traverse */
-    0,		                                   /* tp_clear */
-    0,		                                   /* tp_richcompare */
-    0,		                                   /* tp_weaklistoffset */
-    0,		                                   /* tp_iter */
-    0,		                                   /* tp_iternext */
-    0,                                         /* tp_methods */
-    OSQP_results_members,                      /* tp_members */
-    0,                                         /* tp_getset */
-    0,                                         /* tp_base */
-    0,                                         /* tp_dict */
-    0,                                         /* tp_descr_get */
-    0,                                         /* tp_descr_set */
-    0,                                         /* tp_dictoffset */
-    (initproc)OSQP_results_init,               /* tp_init */
-    0,                                         /* tp_alloc */
-    0,                                         /* tp_new */
-};
-
-
-
-
 /****************************************
  * OSQP Object definition and methods   *
  ****************************************/
@@ -647,24 +205,24 @@ static PyObject * OSQP_setup(OSQP *self, PyObject *args, PyObject *kwargs) {
                                  "scaling", "scaling_norm", "scaling_iter",
                                  "rho", "sigma", "max_iter",
                                  "eps_abs", "eps_rel", "eps_inf", "eps_unb", "alpha",
-                                 "delta", "polishing", "pol_refine_iter", "verbose",
-                                 "warm_start", NULL};               // Settings
+                                 "delta", "polish", "pol_refine_iter", "verbose",
+                                 "early_terminate", "warm_start", NULL};  // Settings
 
 
         #ifdef DLONG
 
         #ifdef DFLOAT
-        static char * argparse_string = "(ll)O!O!O!O!O!O!O!O!O!|lllfflffffffllll";
+        static char * argparse_string = "(ll)O!O!O!O!O!O!O!O!O!|lllfflfffffflllll";
         #else
-        static char * argparse_string = "(ll)O!O!O!O!O!O!O!O!O!|lllddlddddddllll";
+        static char * argparse_string = "(ll)O!O!O!O!O!O!O!O!O!|lllddlddddddlllll";
         #endif
 
         #else
 
         #ifdef DFLOAT
-        static char * argparse_string = "(ii)O!O!O!O!O!O!O!O!O!|iiiffiffffffiiii";
+        static char * argparse_string = "(ii)O!O!O!O!O!O!O!O!O!|iiiffiffffffiiiii";
         #else
-        static char * argparse_string = "(ii)O!O!O!O!O!O!O!O!O!|iiiddiddddddiiii";
+        static char * argparse_string = "(ii)O!O!O!O!O!O!O!O!O!|iiiddiddddddiiiii";
         #endif
 
         #endif
@@ -698,9 +256,10 @@ static PyObject * OSQP_setup(OSQP *self, PyObject *args, PyObject *kwargs) {
                                          &settings->eps_unb,
                                          &settings->alpha,
                                          &settings->delta,
-                                         &settings->polishing,
+                                         &settings->polish,
                                          &settings->pol_refine_iter,
                                          &settings->verbose,
+                                         &settings->early_terminate,
                                          &settings->warm_start)) {
                 return NULL;
         }
@@ -746,7 +305,7 @@ static PyObject *OSQP_constant(OSQP *self, PyObject *args) {
 
     char * constant_name;  // String less than 32 chars
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, "s", &(constant_name))) {
             return NULL;
     }
@@ -805,7 +364,7 @@ static PyObject *OSQP_update_lin_cost(OSQP *self, PyObject *args){
 
     static char * argparse_string = "O!";
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string,
                           &PyArray_Type, &q)) {
             return NULL;
@@ -836,7 +395,7 @@ static PyObject *OSQP_update_lower_bound(OSQP *self, PyObject *args){
 
     static char * argparse_string = "O!";
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string,
                           &PyArray_Type, &l)) {
             return NULL;
@@ -867,7 +426,7 @@ static PyObject *OSQP_update_upper_bound(OSQP *self, PyObject *args){
 
     static char * argparse_string = "O!";
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string,
                           &PyArray_Type, &u)) {
             return NULL;
@@ -899,7 +458,7 @@ static PyObject *OSQP_update_bounds(OSQP *self, PyObject *args){
 
     static char * argparse_string = "O!O!";
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string,
                           &PyArray_Type, &l,
                           &PyArray_Type, &u)) {
@@ -934,7 +493,7 @@ static PyObject *OSQP_warm_start(OSQP *self, PyObject *args){
 
     static char * argparse_string = "O!O!";
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string,
                           &PyArray_Type, &x,
                           &PyArray_Type, &y)) {
@@ -969,7 +528,7 @@ static PyObject *OSQP_warm_start_x(OSQP *self, PyObject *args){
 
     static char * argparse_string = "O!";
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string,
                           &PyArray_Type, &x)) {
             return NULL;
@@ -1000,7 +559,7 @@ static PyObject *OSQP_warm_start_y(OSQP *self, PyObject *args){
 
     static char * argparse_string = "O!";
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string,
                           &PyArray_Type, &y)) {
             return NULL;
@@ -1033,7 +592,7 @@ static PyObject *OSQP_update_max_iter(OSQP *self, PyObject *args){
     #else
     static char * argparse_string = "i";
     #endif
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string, &max_iter_new)) {
             return NULL;
     }
@@ -1059,7 +618,7 @@ static PyObject *OSQP_update_eps_abs(OSQP *self, PyObject *args){
     static char * argparse_string = "d";
     #endif
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string, &eps_abs_new)) {
             return NULL;
     }
@@ -1082,7 +641,7 @@ static PyObject *OSQP_update_eps_rel(OSQP *self, PyObject *args){
     static char * argparse_string = "d";
     #endif
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string, &eps_rel_new)) {
             return NULL;
     }
@@ -1106,7 +665,7 @@ static PyObject *OSQP_update_alpha(OSQP *self, PyObject *args){
     static char * argparse_string = "d";
     #endif
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string, &alpha_new)) {
             return NULL;
     }
@@ -1130,7 +689,7 @@ static PyObject *OSQP_update_delta(OSQP *self, PyObject *args){
     static char * argparse_string = "d";
     #endif
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string, &delta_new)) {
             return NULL;
     }
@@ -1145,8 +704,8 @@ static PyObject *OSQP_update_delta(OSQP *self, PyObject *args){
 }
 
 
-static PyObject *OSQP_update_polishing(OSQP *self, PyObject *args){
-    c_int polishing_new;
+static PyObject *OSQP_update_polish(OSQP *self, PyObject *args){
+    c_int polish_new;
 
     #ifdef DLONG
     static char * argparse_string = "l";
@@ -1154,13 +713,13 @@ static PyObject *OSQP_update_polishing(OSQP *self, PyObject *args){
     static char * argparse_string = "i";
     #endif
 
-    // Parse argumentrs
-    if( !PyArg_ParseTuple(args, argparse_string, &polishing_new)) {
+    // Parse arguments
+    if( !PyArg_ParseTuple(args, argparse_string, &polish_new)) {
             return NULL;
     }
 
     // Perform Update
-    osqp_update_polishing(self->workspace, polishing_new);
+    osqp_update_polish(self->workspace, polish_new);
 
     // Return None
     Py_INCREF(Py_None);
@@ -1177,7 +736,7 @@ static PyObject *OSQP_update_pol_refine_iter(OSQP *self, PyObject *args){
     static char * argparse_string = "i";
     #endif
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string, &pol_refine_iter_new)) {
             return NULL;
     }
@@ -1200,13 +759,36 @@ static PyObject *OSQP_update_verbose(OSQP *self, PyObject *args){
     static char * argparse_string = "i";
     #endif
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string, &verbose_new)) {
             return NULL;
     }
 
     // Perform Update
     osqp_update_verbose(self->workspace, verbose_new);
+
+    // Return None
+    Py_INCREF(Py_None);
+    return Py_None;
+
+}
+
+static PyObject *OSQP_update_early_terminate(OSQP *self, PyObject *args){
+    c_int early_terminate_new;
+
+    #ifdef DLONG
+    static char * argparse_string = "l";
+    #else
+    static char * argparse_string = "i";
+    #endif
+
+    // Parse arguments
+    if( !PyArg_ParseTuple(args, argparse_string, &early_terminate_new)) {
+            return NULL;
+    }
+
+    // Perform Update
+    osqp_update_early_terminate(self->workspace, early_terminate_new);
 
     // Return None
     Py_INCREF(Py_None);
@@ -1223,7 +805,7 @@ static PyObject *OSQP_update_warm_start(OSQP *self, PyObject *args){
     static char * argparse_string = "i";
     #endif
 
-    // Parse argumentrs
+    // Parse arguments
     if( !PyArg_ParseTuple(args, argparse_string, &warm_start_new)) {
             return NULL;
     }
@@ -1240,7 +822,7 @@ static PyObject *OSQP_update_warm_start(OSQP *self, PyObject *args){
 
 static PyMethodDef OSQP_methods[] = {
     {"setup",	(PyCFunction)OSQP_setup,METH_VARARGS|METH_KEYWORDS, PyDoc_STR("Setup OSQP problem")},
-	{"solve",	(PyCFunction)OSQP_solve, METH_VARARGS, PyDoc_STR("Solve OSQP problem")},
+    {"solve",	(PyCFunction)OSQP_solve, METH_VARARGS, PyDoc_STR("Solve OSQP problem")},
     {"version",	(PyCFunction)OSQP_version, METH_NOARGS, PyDoc_STR("OSQP version")},
     {"constant",	(PyCFunction)OSQP_constant, METH_VARARGS, PyDoc_STR("Return internal OSQP constant")},
     {"dimensions",	(PyCFunction)OSQP_dimensions, METH_NOARGS, PyDoc_STR("Return problem dimensions (n, m)")},
@@ -1256,9 +838,10 @@ static PyMethodDef OSQP_methods[] = {
     {"update_eps_rel",	(PyCFunction)OSQP_update_eps_rel, METH_VARARGS, PyDoc_STR("Update OSQP solver setting eps_rel")},
     {"update_alpha",	(PyCFunction)OSQP_update_alpha, METH_VARARGS, PyDoc_STR("Update OSQP solver setting alpha")},
     {"update_delta",	(PyCFunction)OSQP_update_delta, METH_VARARGS, PyDoc_STR("Update OSQP solver setting delta")},
-    {"update_polishing",	(PyCFunction)OSQP_update_polishing, METH_VARARGS, PyDoc_STR("Update OSQP solver setting polishing")},
+    {"update_polish",	(PyCFunction)OSQP_update_polish, METH_VARARGS, PyDoc_STR("Update OSQP solver setting polish")},
     {"update_pol_refine_iter",	(PyCFunction)OSQP_update_pol_refine_iter, METH_VARARGS, PyDoc_STR("Update OSQP solver setting pol_refine_iter")},
     {"update_verbose",	(PyCFunction)OSQP_update_verbose, METH_VARARGS, PyDoc_STR("Update OSQP solver setting verbose")},
+    {"update_early_terminate",	(PyCFunction)OSQP_update_early_terminate, METH_VARARGS, PyDoc_STR("Update OSQP solver setting early_terminate")},
     {"update_warm_start",	(PyCFunction)OSQP_update_warm_start, METH_VARARGS, PyDoc_STR("Update OSQP solver setting warm_start")},
     {NULL,		NULL}		/* sentinel */
 };
@@ -1305,88 +888,3 @@ static PyTypeObject OSQP_Type = {
     0,                                         /* tp_alloc */
     0,                                         /* tp_new */
 };
-
-
-
-
-
-
-/************************
- * Interface Methods    *
- ************************/
-
-
- /* Module initialization for Python 3*/
- #if PY_MAJOR_VERSION >= 3
- static struct PyModuleDef moduledef = {
-     PyModuleDef_HEAD_INIT, "_osqp",           /* m_name */
-     NULL,         /* m_doc */
-     -1,                                       /* m_size */
-     OSQP_methods,                             /* m_methods */
-     NULL,                                 /* m_reload */
-     NULL,                                 /* m_traverse */
-     NULL,                                 /* m_clear */
-     NULL,                                 /* m_free */
- };
- #endif
-
-
-
-static PyObject * moduleinit(void){
-
-    PyObject *m;
-
-    // Initialize module (no methods. all inside OSQP object)
-    #if PY_MAJOR_VERSION >= 3
-    m = PyModule_Create(&moduledef);
-    #else
-    m = Py_InitModule3("_osqp", NULL, NULL);
-    #endif
-    if (m == NULL)
-        return NULL;
-
-    // Initialize OSQP_Type
-    OSQP_Type.tp_new = PyType_GenericNew;
-    if (PyType_Ready(&OSQP_Type) < 0)     // Initialize OSQP_Type
-        return NULL;
-
-    // Add type to the module dictionary and initialize it
-    Py_INCREF(&OSQP_Type);
-    if (PyModule_AddObject(m, "OSQP", (PyObject *)&OSQP_Type) < 0)
-        return NULL;
-
-
-    // Initialize Info Type
-    OSQP_info_Type.tp_new = PyType_GenericNew;
-    if (PyType_Ready(&OSQP_info_Type) < 0)
-        return NULL;
-
-    // Initialize Results Type
-    OSQP_results_Type.tp_new = PyType_GenericNew;
-    if (PyType_Ready(&OSQP_results_Type) < 0)
-        return NULL;
-
-    return m;
-}
-
-
-
-
-// Init Osqp Internal module
-#if PY_MAJOR_VERSION >= 3
-PyMODINIT_FUNC PyInit__osqp(void)
-#else
-PyMODINIT_FUNC init_osqp(void)
-#endif
-{
-
-        import_array(); /* for numpy arrays */
-
-        // Module initialization is not a global variable in
-        // Python 3
-        #if PY_MAJOR_VERSION >= 3
-        return moduleinit();
-        #else
-        moduleinit();
-        #endif
-}
