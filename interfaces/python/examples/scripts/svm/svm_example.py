@@ -254,9 +254,9 @@ def run_svm_example():
     np.random.seed(1)
 
     # Parameter dimension
-    # n_vec = np.array([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
+    n_vec = np.array([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
     # n_vec = np.array([100, 200, 300])
-    n_vec = np.array([800, 900, 1000])
+    # n_vec = np.array([800, 900, 1000])
 
     # Factors
     m_vec = n_vec * 10
