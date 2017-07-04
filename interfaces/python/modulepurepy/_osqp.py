@@ -64,10 +64,6 @@ SUITESPARSE_LDL = 0
 # AUTO_RHO_BETA1 = -0.67858183687448892
 # AUTO_RHO_BETA2 = -0.037034234262609413
 
-
-
-
-
 # No regularization. interval [1, 1.2] (depends on traces)
 #  AUTO_RHO_BETA0 = 2.2377322735057317
 #  AUTO_RHO_BETA1 = 0.73909558577990619
@@ -393,14 +389,14 @@ class OSQP(object):
 
             # Ruiz equilibration
             for j in range(n + m):
-                norm_col_j = np.linalg.norm(np.asarray(KKT[:, j].todense()),
+                norm_col_j = la.norm(np.asarray(KKT[:, j].todense()),
                                             np.inf)
                 #  print("norm col %i = %.4e" % (j, norm_col_j))
-                #  norm_row_j = np.linalg.norm(KKT_temp[j, :].A1, np.inf)
+                #  norm_row_j = la.norm(KKT_temp[j, :].A1, np.inf)
                 #  print("norm row %i = %.4e" % (j, norm_row_j))
-                #  norm_col_j = np.linalg.norm(KKT_temp[j, :], np.inf)
-                #  norm_col_j = np.linalg.norm(KKT_temp[j, :], 2)
-                #  norm_col_j = np.linalg.norm(KKT_temp[j, :], 1)
+                #  norm_col_j = la.norm(KKT_temp[j, :], np.inf)
+                #  norm_col_j = la.norm(KKT_temp[j, :], 2)
+                #  norm_col_j = la.norm(KKT_temp[j, :], 1)
                 #  d[j] = 1./(np.sqrt(norm_col_j) + SCALING_REG)
                 if norm_col_j > SCALING_REG:
                     d_temp[j] = 1./(np.sqrt(norm_col_j))
@@ -433,7 +429,7 @@ class OSQP(object):
             #  max_norm_rows = 0.0
             #  min_norm_rows = np.inf
             #  for j in range(n_plus_m):
-            #     norm_row_j = np.linalg.norm(np.asarray(KKT[j, :].todense()))
+            #     norm_row_j = la.norm(np.asarray(KKT[j, :].todense()))
             #     max_norm_rows = np.maximum(norm_row_j,
             #                                max_norm_rows)
             #     min_norm_rows = np.minimum(norm_row_j,
@@ -635,15 +631,11 @@ class OSQP(object):
             (1. - self.work.settings.alpha) * self.work.x_prev
         self.work.delta_x = self.work.x - self.work.x_prev
 
-    def project_z(self):
+    def project(self, z):
         """
         Project z variable in set C (for now C = [l, u])
         """
-        # proj_z = np.minimum(np.maximum(self.work.z,
-        #                     self.work.data.l), self.work.data.u)
-        # set_trace()
-        self.work.z = np.minimum(np.maximum(self.work.z,
-                                 self.work.data.l), self.work.data.u)
+        return np.minimum(np.maximum(z, self.work.data.l), self.work.data.u)
 
     def update_z(self):
         """
@@ -654,7 +646,7 @@ class OSQP(object):
             (1. - self.work.settings.alpha) * self.work.z_prev +\
             1./self.work.settings.rho * self.work.y
 
-        self.project_z()
+        self.work.z = self.project(self.work.z)
 
     def update_y(self):
         """
@@ -953,7 +945,6 @@ class OSQP(object):
         else:
             print("Run time: %.3fms" % (1e03*self.work.info.run_time))
 
-
         print("")  # Print last space
 
     def store_solution(self):
@@ -1006,8 +997,10 @@ class OSQP(object):
         self.work.xz_tilde = np.zeros(n + m)
         self.work.x_prev = np.zeros(n)
         self.work.z_prev = np.zeros(m)
+        self.work.y_prev = np.zeros(m)
         self.work.y = np.zeros(m)
-        self.work.delta_y = np.zeros(m)       # Delta_y for primal infeasibility
+        self.work.delta_y = np.zeros(m)   # Delta_y for primal infeasibility
+        self.work.delta_x = np.zeros(n)   # Delta_x for dual infeasibility
 
         # Flag indicating first run
         self.work.first_run = 1
@@ -1042,6 +1035,134 @@ class OSQP(object):
         if self.work.settings.verbose:
             self.print_setup_header(self.work.data, self.work.settings)
 
+    def single_admm_step(self):
+        """
+        Run single ADMM step
+        """
+
+        # Update x_prev_prev, z_prev_prev, y_prev_prev
+        # self.work.x_prev_prev = np.copy(self.work.x_prev)
+        # self.work.z_prev_prev = np.copy(self.work.z_prev)
+        # self.work.y_prev_prev = np.copy(self.work.y_prev)
+
+        # Update x_prev, z_prev, y_prev
+        self.work.x_prev = np.copy(self.work.x)
+        self.work.z_prev = np.copy(self.work.z)
+        self.work.y_prev = np.copy(self.work.y)
+
+        # Admm steps
+        # First step: update \tilde{x} and \tilde{z}
+        self.update_xz_tilde()
+
+        # Second step: update x and z
+        self.update_x()
+        self.update_z()
+
+        # Third step: update y
+        self.update_y()
+
+    def alpha_acceleration(self):
+        """
+        Perform alpha acceleration using the operator q^{k+1} = T q^{k}
+
+        where q^{k} = (x^{k}, z^{k} + y^{k}/rho)
+        """
+        ALPHA_MAX = 50
+        ALPHA_RED = 0.7
+        EPS_ACCELERATION = 1e-03
+        EPS_ACTIVATION_ACCELERATION = 1e-08
+
+        # Compute q_prev, q, q_next
+        # q_prev = np.append(self.work.x_prev_prev,
+        #                    self.work.z_prev_prev +
+        #                    self.work.y_prev_prev/self.work.settings.rho)
+        q = np.append(self.work.x_prev,
+                      self.work.z_prev +
+                      self.work.y_prev/self.work.settings.rho)
+        q_next = np.append(self.work.x,
+                           self.work.z +
+                           self.work.y/self.work.settings.rho)
+
+        # Compute current fixed-point residual
+        r = q_next - q
+
+        # Check if we need to accelerate or not
+        # delta_q = q - q_prev
+        # delta_q_next = q_next - q
+        # if la.norm(delta_q) > 1e-09 and la.norm(delta_q_next) > 1e-09:
+        #     cos_angle_delta_q = delta_q_next.dot(delta_q) / \
+        #         (la.norm(delta_q) * la.norm(delta_q_next))
+        #     # print("cos_angle_delta_q = %.4f" % cos_angle_delta_q)
+        # else:
+        #     cos_angle_delta_q = 0.0
+        #
+        # if cos_angle_delta_q > (1 - EPS_ACTIVATION_ACCELERATION):
+        if (self.work.info.iter % 100 == 0):
+            # Colinear vectors -> perform acceleration!
+            print("Perform acceleration")
+
+            # Compute next residual
+            self.single_admm_step()
+            q_next_next = np.append(self.work.x,
+                                    self.work.z +
+                                    self.work.y/self.work.settings.rho)
+            r_next_nom = q_next_next - q_next
+
+            # Search for alpha
+            alpha = ALPHA_MAX
+            while alpha > self.work.settings.alpha:
+                print("alpha = %.4f" % alpha)
+                q_temp = q + alpha * r
+
+                # Check new residual
+                # 1) Assign new q_temp to x, z, y
+                import ipdb; ipdb.set_trace()
+                self.work.x = q_temp[:self.work.data.n]
+                v = q_temp[self.work.data.n:]
+                self.work.z = self.project(v)
+                self.work.y = self.work.settings.rho * (v - self.project(v))
+
+                # 2) Perform one admm step
+                self.single_admm_step()
+
+                # 3) Get new q_next_next
+                q_next_next = np.append(self.work.x,
+                                        self.work.z +
+                                        self.work.y/self.work.settings.rho)
+
+                # 4) compare new residual
+                r_next = q_next_next - q_next
+                print("||r^{k+1}|| = %.4f      " % la.norm(r_next), end='')
+                print("||\\bar{r}^{k+1}|| = %.4f     " % la.norm(r_next_nom), end='')
+                condition_acc = la.norm(r_next) <= (1. - EPS_ACCELERATION) * \
+                    la.norm(r_next_nom)
+                print("||r^{k+1}|| < ||\\bar{r}^{k+1}|| : %r" % condition_acc)
+                if condition_acc:
+                    print("better alpha found! alpha = %.4f" % alpha)
+                    q_next = q_temp
+                    break
+
+
+                alpha = ALPHA_RED * alpha
+
+            import ipdb; ipdb.set_trace()
+
+            # Store q and q_prev in workspace
+            self.work.x_prev = q[:self.work.data.n]
+            v_prev = q[self.work.data.n:]
+            self.work.z_prev = self.project(v_prev)
+            self.work.y_prev = self.work.settings.rho * \
+                (v_prev - self.project(v_prev))
+
+            self.work.x = q_next[:self.work.data.n]
+            v = q_next[self.work.data.n:]
+            self.work.z = self.project(v)
+            self.work.y = self.work.settings.rho * (v - self.project(v))
+
+            # Update delta_x delta_y in the end
+            self.work.delta_x = self.work.x - self.work.x_prev
+            self.work.delta_y = self.work.y - self.work.y_prev
+
     def solve(self):
         """
         Solve QP problem using OSQP
@@ -1059,23 +1180,13 @@ class OSQP(object):
 
         # ADMM algorithm
         for iter in range(1, self.work.settings.max_iter + 1):
-            # Update x_prev, z_prev
-            self.work.x_prev = np.copy(self.work.x)
-            self.work.z_prev = np.copy(self.work.z)
+            # Run single admm step
+            self.single_admm_step()
 
-            # Admm steps
-            # First step: update \tilde{x} and \tilde{z}
-            self.update_xz_tilde()
+            # Perform acceleration (if necessary)
+            self.alpha_acceleration()
 
-            # Second step: update x and z
-            self.update_x()
-
-            self.update_z()
-
-            # Third step: update y
-            self.update_y()
-
-
+            # Check algorithm termination
             if self.work.settings.early_terminate:
                 # Update info
                 self.update_info(iter, 0)

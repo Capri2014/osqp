@@ -9,8 +9,8 @@ import os
 from utils.utils import load_maros_meszaros_problem
 import mathprogbasepy as mpbpy
 
-#  import osqppurepy as osqp
-import osqp
+import osqppurepy as osqp
+# import osqp
 
 
 def constrain_scaling(s, min_val, max_val):
@@ -36,6 +36,8 @@ n_unsolved = 0
 # Solve all Maroz Meszaros problems
 for f in lst_probs:
 
+    if f[:-4] == 'QAFIRO':
+    # if f[:-4] == 'DUALC1':
     # if f[:-4] == 'CVXQP1_M':
     # if f[:-4] == 'AUG2DCQP':
     # if f[:-4] == 'BOYD1':
@@ -44,10 +46,11 @@ for f in lst_probs:
     # if f[:-4] == 'CONT-101':
     # if f[:-4] == 'CONT-300':
     # if True:
-
+    # if f[:-4] == 'STADAT1':
+    # if f[:-4] == 'AUG3D':
+    # if f[:-4] == 'QSHIP04S':
 
         m = load_maros_meszaros_problem(prob_dir + "/" + f)  # Load problem
-
 
         print("%3i) %s\t" % (p, f[:-4]), end='')
 
@@ -55,17 +58,19 @@ for f in lst_probs:
         # res = m.solve(solver=mpbpy.OSQP, verbose=True)  # No verbosity
 
 
-
         # Normalize cost (TODO: remove)
-        #  norm_q = np.linalg.norm(m.q)
+        # norm_q = np.linalg.norm(m.q)
         #  # cost_scal = 1.
         #  cost_scal = constrain_scaling(norm_q, 1e-03, 1e03)
-        #  if norm_q < 1e-06:   #  q is null!
-        #      cost_scal = 1.
+        # if norm_q < 1e-06:   #  q is null!
+        #     cost_scal = 1.
+        # else:
+        #     cost_scal = norm_q
 
         # P = m.P / cost_scal
         # q = m.q / cost_scal
 
+        # Remove scaling
         cost_scal = 1
 
 
@@ -122,8 +127,8 @@ for f in lst_probs:
 
         s = osqp.OSQP()
         s.setup(P, q, A, l, u,
-                verbose=False,
-                max_iter=10000)
+                verbose=True,
+                max_iter=2500)
                 # early_terminate_interval=1)
         res = s.solve()
 
