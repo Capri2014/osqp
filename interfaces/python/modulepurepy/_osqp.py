@@ -196,6 +196,7 @@ class settings(object):
     eps_prim_inf  [1e-06]                    - Primal infeasibility tolerance
     eps_dual_inf  [1e-06]                    - Dual infeasibility tolerance
     alpha [1.6]                         - Relaxation parameter
+    line_search [True]                  - Line search acceleration
     delta [1.0]                         - Regularization parameter for polish
     verbose  [True]                     - Verbosity
     scaled_termination [True]             - Evalute scaled termination criteria
@@ -219,6 +220,7 @@ class settings(object):
         self.eps_prim_inf = kwargs.pop('eps_prim_inf', 1e-4)
         self.eps_dual_inf = kwargs.pop('eps_dual_inf', 1e-4)
         self.alpha = kwargs.pop('alpha', 1.6)
+        self.line_search = kwargs.pop('line_search', False)
         self.linsys_solver = kwargs.pop('linsys_solver', SUITESPARSE_LDL)
         self.delta = kwargs.pop('delta', 1e-6)
         self.verbose = kwargs.pop('verbose', True)
@@ -1078,16 +1080,6 @@ class OSQP(object):
         # Get x, z, y from q
         x, z, y = self.xzy_from_q(q)
 
-        # DEBUG
-        # print("x = ", end=''); print(x)
-        # print("z = ", end=''); print(z)
-        # print("y = ", end=''); print(y)
-        # q_temp = self.q_from_xzy(x, z, y)
-        # x, z, y = self.xzy_from_q(q_temp)
-        # print("x = ", end=''); print(x)
-        # print("z = ", end=''); print(z)
-        # print("y = ", end=''); print(y)
-
         # Admm steps
         # First step: update \tilde{x} and \tilde{z}
         x_tilde, z_tilde = self.update_xz_tilde(x, z, y)
@@ -1110,9 +1102,9 @@ class OSQP(object):
         """
 
         # Update x_prev_prev, z_prev_prev, y_prev_prev
-        # self.work.x_prev_prev = np.copy(self.work.x_prev)
-        # self.work.z_prev_prev = np.copy(self.work.z_prev)
-        # self.work.y_prev_prev = np.copy(self.work.y_prev)
+        self.work.x_prev_prev = np.copy(self.work.x_prev)
+        self.work.z_prev_prev = np.copy(self.work.z_prev)
+        self.work.y_prev_prev = np.copy(self.work.y_prev)
 
         # Update x_prev, z_prev, y_prev
         self.work.x_prev = np.copy(self.work.x)
@@ -1135,95 +1127,108 @@ class OSQP(object):
         self.work.delta_x = self.work.x - self.work.x_prev
         self.work.delta_y = self.work.y - self.work.y_prev
 
-    # def alpha_acceleration(self):
-    #     """
-    #     Perform alpha acceleration using the operator q^{k+1} = T q^{k}
-    #
-    #     where q^{k} = (x^{k}, z^{k} + y^{k}/rho)
-    #     """
-    #     ALPHA_MAX = 50
-    #     ALPHA_RED = 0.9
-    #     EPS_ACCELERATION = 1e-03
-    #     EPS_ACTIVATION_ACCELERATION = 1e-08
-    #
-    #     # Get current vectors
-    #     x_prev_prev = self.work.x_prev_prev
-    #     y_prev_prev = self.work.y_prev_prev
-    #     z_prev_prev = self.work.z_prev_prev
-    #     x_prev = self.work.x_prev
-    #     y_prev = self.work.y_prev
-    #     z_prev = self.work.z_prev
-    #     x = self.work.x
-    #     y = self.work.y
-    #     z = self.work.z
-    #
-    #     # Compute q_prev, q, q_next
-    #     q_prev = self.q_from_xzy(x_prev_prev, z_prev_prev, y_prev_prev)
-    #     q = self.q_from_xzy(x_prev, z_prev, y_prev)
-    #     q_next = self.q_from_xzy(x, z, y)
-    #
-    #     # Compute current fixed-point residual (acceleration direction)
-    #     r = q_next - q
-    #
-    #     # Check if we need to accelerate or not
-    #     delta_q = q - q_prev
-    #     delta_q_next = q_next - q
-    #     if la.norm(delta_q) > 1e-09 and la.norm(delta_q_next) > 1e-09:
-    #         cos_angle_delta_q = delta_q_next.dot(delta_q) / \
-    #             (la.norm(delta_q) * la.norm(delta_q_next))
-    #         # print("cos_angle_delta_q = %.4f" % cos_angle_delta_q)
-    #     else:
-    #         cos_angle_delta_q = 0.0
-    #
-    #     if cos_angle_delta_q > (1 - EPS_ACTIVATION_ACCELERATION):
-    #         # Colinear vectors -> perform acceleration!
-    #         print("Perform acceleration")
-    #
-    #         # Compute next residual (apply operator T again)
-    #         q_next_next_nom = self.operator_T(q_next)
-    #         r_next_nom = q_next_next_nom - q_next
-    #
-    #         # Search for alpha
-    #         alpha_prev = self.work.settings.alpha
-    #         alpha = (1. + np.sqrt(1. + 4.*(alpha_prev ** 2)))/2.
-    #         q_temp_prev = q_next
-    #
-    #         while alpha < ALPHA_MAX:
-    #
-    #             print("alpha = %.4f" % alpha)
-    #             q_temp = q + alpha * r
-    #
-    #             # Check new residual
-    #             q_next_next = self.operator_T(q_temp)
-    #             r_next = q_next_next - q_next
-    #
-    #             print("||r^{k+1}|| = %.4f      " % la.norm(r_next), end='')
-    #             print("||\\bar{r}^{k+1}|| = %.4f     " %
-    #                   la.norm(r_next_nom), end='')
-    #             condition_acc = la.norm(r_next) < (1. - EPS_ACCELERATION) * \
-    #                 la.norm(r_next_nom)
-    #             print("||r^{k+1}|| < ||\\bar{r}^{k+1}|| : %r"%condition_acc)
-    #             if not condition_acc:
-    #                 if alpha > self.work.settings.alpha:
-    #                     print("better alpha found! alpha = %.4f" % alpha_prev)
-    #                     import ipdb; ipdb.set_trace()
-    #                 q_next = q_temp_prev
-    #                 break
-    #
-    #             q_temp_prev = np.copy(q_temp)
-    #             alpha_prev = np.copy(alpha)
-    #             alpha = (1. + np.sqrt(1. + 4. * (alpha_prev ** 2))) / 2.
-    #
-    #             # alpha = ALPHA_RED * alpha
-    #
-    #         # import ipdb; ipdb.set_trace()
-    #
-    #         # Get new x, y, z
-    #         self.work.x, self.work.z, self.work.y = self.xzy_from_q(q_next)
-    #
-    #         # Get deltas
-    #         self.work.delta_x = self.work.x - self.work.x_prev
-    #         self.work.delta_y = self.work.y - self.work.y_prev
+    def alpha_acceleration(self):
+        """
+        Perform alpha acceleration using the operator q^{k+1} = T q^{k}
+
+        where q^{k} = (x^{k}, z^{k} + y^{k}/rho)
+        """
+        ALPHA_MAX = 1000
+        ALPHA_RED = 0.7
+        EPS_ACCELERATION = 1e-05
+        EPS_ACTIVATION_ACCELERATION = 1e-06
+
+        # Get current vectors
+        x_prev_prev = self.work.x_prev_prev
+        y_prev_prev = self.work.y_prev_prev
+        z_prev_prev = self.work.z_prev_prev
+        x_prev = self.work.x_prev
+        y_prev = self.work.y_prev
+        z_prev = self.work.z_prev
+        x = self.work.x
+        y = self.work.y
+        z = self.work.z
+
+        # Compute q_prev, q, q_next
+        q_prev = self.q_from_xzy(x_prev_prev, z_prev_prev, y_prev_prev)
+        q = self.q_from_xzy(x_prev, z_prev, y_prev)
+        q_next = self.q_from_xzy(x, z, y)
+
+        # Compute current fixed-point residual (acceleration direction)
+        r = q_next - q
+
+        # Check if we need to accelerate or not
+        delta_q = q - q_prev
+        delta_q_next = q_next - q
+        if la.norm(delta_q) > 1e-09 and la.norm(delta_q_next) > 1e-09:
+            cos_angle_delta_q = delta_q_next.dot(delta_q) / \
+                (la.norm(delta_q) * la.norm(delta_q_next))
+            # print("cos_angle_delta_q = %.4f" % cos_angle_delta_q)
+        else:
+            cos_angle_delta_q = 0.0
+
+        if cos_angle_delta_q > (1 - EPS_ACTIVATION_ACCELERATION):
+            # Colinear vectors -> perform acceleration!
+            print("Perform acceleration   ", end='')
+
+            # Compute next residual (apply operator T again)
+            q_next_next_nom = self.operator_T(q_next)
+            r_next_nom = q_next_next_nom - q_next
+
+            # # Search for alpha
+            # alpha_prev = self.work.settings.alpha
+            # alpha = (1. + np.sqrt(1. + 4.*(alpha_prev ** 2)))/2.
+            # q_temp_prev = q_next
+            # while alpha < ALPHA_MAX:
+
+            alpha = ALPHA_MAX
+            while alpha > self.work.settings.alpha:
+
+                # print("alpha = %.4f" % alpha)
+                q_temp = q + alpha * r
+
+                # Check new residual
+                q_next_next = self.operator_T(q_temp)
+                r_next = q_next_next - q_temp
+
+                # print("||r^{k+1}|| = %.4f      " % la.norm(r_next), end='')
+                # print("||\\bar{r}^{k+1}|| = %.4f     " %
+                    #   la.norm(r_next_nom), end='')
+                condition_acc = la.norm(r_next) < (1. - EPS_ACCELERATION) * \
+                    la.norm(r_next_nom)
+                # print("||r^{k+1}|| < ||\\bar{r}^{k+1}|| : %r" % condition_acc)
+
+                if condition_acc:
+                    print("better alpha found! alpha = %.4f" % alpha)
+                    q_next = q_temp
+                    break
+
+                # Increase alpha
+                alpha = ALPHA_RED * alpha
+
+                # if not condition_acc:
+                #     if alpha > self.work.settings.alpha:
+                #         print("better alpha found! alpha = %.4f" % alpha_prev)
+                #         import ipdb; ipdb.set_trace()
+                #     q_next = q_temp_prev
+                #     break
+                #
+                # q_temp_prev = np.copy(q_temp)
+                # alpha_prev = np.copy(alpha)
+                # alpha = (1. + np.sqrt(1. + 4. * (alpha_prev ** 2))) / 2.
+
+                # alpha = ALPHA_RED * alpha
+
+            if alpha < self.work.settings.alpha:
+                print("no better alpha found!")
+            # import ipdb; ipdb.set_trace()
+
+            # Get new x, y, z
+            self.work.x, self.work.z, self.work.y = self.xzy_from_q(q_next)
+
+            # Get deltas
+            self.work.delta_x = self.work.x - self.work.x_prev
+            self.work.delta_y = self.work.y - self.work.y_prev
 
     def solve(self):
         """
@@ -1248,8 +1253,9 @@ class OSQP(object):
             # Run single admm step
             self.single_admm_step()
 
-            # Perform acceleration (if necessary)
-            # self.alpha_acceleration()
+            if self.work.settings.line_search:
+                # Perform acceleration (if necessary)
+                self.alpha_acceleration()
 
             # Check algorithm termination
             if self.work.settings.early_terminate:
@@ -1267,8 +1273,13 @@ class OSQP(object):
 
         # Plot norm of q
         import matplotlib.pylab as plt
-        plt.figure()
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.set_ylabel(r'$\|q_{k+1} - q_{k}\|$')
         plt.semilogy(self.work.norm_rk)
+        ax.set_xlim([0, self.work.settings.max_iter])
+        plt.grid()
+        plt.tight_layout()
         plt.show(block=False)
         # import ipdb; ipdb.set_trace()
 
