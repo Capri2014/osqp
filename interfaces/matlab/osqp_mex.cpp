@@ -89,7 +89,10 @@ const char* OSQP_SCALING_FIELDS[] = {"D",       //c_float*
                                      "Dinv",    //c_float*
                                      "Einv"};   //c_float*
 
-const char* OSQP_WORKSPACE_FIELDS[] = {"data",
+const char* OSQP_WORKSPACE_FIELDS[] = {"xiter",
+                                       "yiter",
+                                       "ziter",
+                                       "data",
                                        "priv",
                                        "scaling",
                                        "settings"};
@@ -894,6 +897,17 @@ mxArray*  copyWorkToMxStruct(OSQPWorkspace* work){
 
   int nfields  = sizeof(OSQP_WORKSPACE_FIELDS) / sizeof(OSQP_WORKSPACE_FIELDS[0]);
   mxArray* mxPtr = mxCreateStructMatrix(1,1,nfields,OSQP_WORKSPACE_FIELDS);
+
+  // Copy iterates data
+  mxArray* xiter    = mxCreateDoubleMatrix(work->data->n,1,mxREAL);
+  mxArray* yiter    = mxCreateDoubleMatrix(work->data->m,1,mxREAL);
+  mxArray* ziter    = mxCreateDoubleMatrix(work->data->m,1,mxREAL);
+  castToDoubleArr(work->x, mxGetPr(xiter), work->data->n);
+  castToDoubleArr(work->y, mxGetPr(yiter), work->data->m);
+  castToDoubleArr(work->z, mxGetPr(ziter), work->data->m);
+  mxSetField(mxPtr,0,"xiter",xiter);
+  mxSetField(mxPtr,0,"yiter",yiter);
+  mxSetField(mxPtr,0,"ziter",ziter);
 
   // Create workspace substructures
   mxArray* data     = copyDataToMxStruct(work);
