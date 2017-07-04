@@ -1,0 +1,49 @@
+test1 : standard problem configuration.  Convergence check on unscaled residuals
+
+test2 : standard problem configuration.  Convergence check on scaled residuals
+
+test3 : primal then dual pre-scaling.  Convergence check on scaled residuals
+
+! test4:  primal pre-scaling only.  Convergence check on scaled residuals
+
+test5:  dual pre-scaling only.  Convergence check on scaled residuals
+
+test6: standard problem configuration, alpha = 1.  Convergence check on scaled residuals.
+
+test7: manual perfect scaling with my Ruiz method, inf norm.  Convergence check on scaled residuals.
+
+test8: manual perfect scaling with my Ruiz method, 2 norm.  Convergence check on scaled residuals.
+
+test9: standard problem configuration, but with 2 norm Ruiz scaling.  Convergence check on scaled residuals.  IOW, test 2 but with Ruiz=2.
+
+test10: standard problem configuration, but with 1 norm Ruiz scaling.  Convergence check on scaled residuals.  IOW, test 2 but with Ruiz=1.
+
+test11: manual perfect scaling with my Ruiz method, 1 norm.  Convergence check on scaled residuals.
+
+test12:  primal pre-scaling only, Ruiz 1 norm.  Convergence check on scaled residuals
+
+test13:  primal pre-scaling only, Rui 2 norm.  Convergence check on scaled residuals
+
+test14:  primal pre-scaling only, Ruiz inf norm.  Convergence check on scaled residuals.  (Sanity check, should be same as test4)
+
+test15:  same as test 4 (primal scaling), but with max iter = 500
+
+test16:  same as test 4 (primal scaling), but with max iter = 150
+
+test17:  same as test 4 (primal scaling), but with max iter = 50
+
+test18:  same as test 4 (primal scaling), but with primal pre-scaling with 1 norm
+
+test19:  same as test 4 (primal scaling), but with primal pre-scaling with inf norm
+
+test20:  same as test 18 (1-norm primal scaling), but with Ruiz 1 norm;
+
+! test21:  same as test 18 (1-norm primal scaling), but with Ruiz 2 norm;
+
+! test22:  1 norm primal/dual pre-scaling, Ruiz 2 norm;
+
+test23: non-convex joint scaling.  Ruiz 2 norm;
+
+
+SO FAR, 18 and 21, 22 are best.  22 is not much different from 21?
+ 
