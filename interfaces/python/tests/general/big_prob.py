@@ -31,7 +31,7 @@ osqp_opts = {'rho': 0.1,
              'scaled_termination': False,
              'early_terminate_interval': 1,
              'polish': False,
-             'max_iter': 10,
+             'max_iter': 2500,
              'verbose': True
              }
 

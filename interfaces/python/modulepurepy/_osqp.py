@@ -19,7 +19,7 @@ OSQP_DUAL_INFEASIBLE = -4
 OSQP_UNSOLVED = -10
 
 # Printing interval
-PRINT_INTERVAL = 1
+PRINT_INTERVAL = 100
 
 # OSQP Infinity
 OSQP_INFTY = 1e+20
@@ -617,25 +617,25 @@ class OSQP(object):
         xz_tilde = np.zeros(n + m)
 
         # Compute rhs and store it in xz_tilde
-        xz_tilde[:n] = sigma * x - self.work.data.q
-        xz_tilde[n:] = z - (1./rho) * y
+        rhs = np.append(sigma * x - self.work.data.q,
+                        z - (1./rho) * y)
 
         # Solve linear system
-        xz_tilde = self.work.linsys_solver.solve(xz_tilde)
+        sol = self.work.linsys_solver.solve(rhs)
 
         # Update z_tilde
-        v = xz_tilde[n:]
-        xz_tilde[n:] = z + (1./rho) * (v - y)
+        x_tilde = sol[:n]
+        v = sol[n:]
+        z_tilde = z + (1./rho) * (v - y)
 
-        # Return xz_tilde
-        return xz_tilde
+        # Return
+        return x_tilde, z_tilde
 
-    def update_x(self, xz_tilde, x):
+    def update_x(self, x_tilde, x):
         """
         Update x variable in second ADMM step
         """
         alpha = self.work.settings.alpha
-        x_tilde = xz_tilde[:self.work.data.n]
 
         x_new = alpha * x_tilde + (1. - alpha) * x
 
@@ -647,28 +647,24 @@ class OSQP(object):
         """
         return np.minimum(np.maximum(z, self.work.data.l), self.work.data.u)
 
-    def update_z(self, xz_tilde, z, y):
+    def update_z(self, z_tilde, z, y):
         """
         Update z variable in second ADMM step
         """
         alpha = self.work.settings.alpha
         rho = self.work.settings.rho
-        n = self.work.data.n
-        z_tilde = xz_tilde[n:]
 
         # new z
         z_new = alpha * z_tilde + (1. - alpha) * z + (1./rho) * y
 
         return self.project(z_new)
 
-    def update_y(self, y, xz_tilde, z_new, z):
+    def update_y(self, y, z_tilde, z_new, z):
         """
         Third ADMM step: update dual variable y
         """
         rho = self.work.settings.rho
         alpha = self.work.settings.alpha
-        n = self.work.data.n
-        z_tilde = xz_tilde[n:]
 
         # New y
         return y + rho * (alpha * z_tilde + (1. - alpha) * z - z_new)
@@ -1054,7 +1050,7 @@ class OSQP(object):
     Define methods related to operator T
     '''
 
-    def q_from_xzy(self, x, y, z):
+    def q_from_xzy(self, x, z, y):
         """
         Obtain q from x, z, y vectors
         """
@@ -1094,14 +1090,14 @@ class OSQP(object):
 
         # Admm steps
         # First step: update \tilde{x} and \tilde{z}
-        xz_tilde = self.update_xz_tilde(x, z, y)
+        x_tilde, z_tilde = self.update_xz_tilde(x, z, y)
 
         # Second step: update x and z
-        x_new = self.update_x(xz_tilde, x)
-        z_new = self.update_z(xz_tilde, z, y)
+        x_new = self.update_x(x_tilde, x)
+        z_new = self.update_z(z_tilde, z, y)
 
         # Third step: update y
-        y_new = self.update_y(y, xz_tilde, z_new, z)
+        y_new = self.update_y(y, z_tilde, z_new, z)
 
         # Get q_new from x_new, z_new, y_new
         q_new = self.q_from_xzy(x_new, z_new, y_new)
