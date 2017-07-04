@@ -44,6 +44,10 @@ test20:  same as test 18 (1-norm primal scaling), but with Ruiz 1 norm;
 
 test23: non-convex joint scaling.  Ruiz 2 norm;
 
+test24: non-convex joint scaling.  Ruiz 1 norm;
 
-SO FAR, 18 and 21, 22 are best.  22 is not much different from 21?
+test25: non-convex joint scaling.  Ruiz inf norm;
+
+
+SO FAR, 4, 18 and 21, 22 are best.  22 is not much different from 21?
  

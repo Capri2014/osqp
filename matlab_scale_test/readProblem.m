@@ -165,6 +165,7 @@ function problem = doNonConvexScaling(problem,ruizNorm)
 
 %make sure it is one sided
 problem = makeOneSided(problem);
+oneSidedProblem = problem; %debug
 
 %make a nonconvex QP by adding one variable with unit cost and size
 P = [problem.P problem.q; problem.q' 0];
@@ -188,14 +189,15 @@ ncvxProblem.l = l;
 [ncvxProblemScaled,D,E] = doManualScaling(ncvxProblem, ruizNorm);
 
 %now eliminate the final variable that was making it non-convex
-scaledConstant = ncvxProblemScaled.u(end);
-problem.P = ncvxProblemScaled.P(1:end-1,1:end-1);
-problem.A = ncvxProblemScaled.A(1:end-1,1:end-1);
-problem.q = ncvxProblemScaled.q(1:end-1,:).*scaledConstant;
-problem.u = ncvxProblemScaled.u(1:end-1,:).*scaledConstant;
-problem.l = repmat(-inf,size(problem.u));
+problem = scaleProblem(oneSidedProblem,D(1:end-1,1:end-1),E(1:end-1,1:end-1));
 
-
+%NB : final line above is the same as
+% scaledConstant = ncvxProblemScaled.u(end)./ncvxProblemScaled.A(end,end);
+% problem.P = ncvxProblemScaled.P(1:end-1,1:end-1);
+% problem.A = ncvxProblemScaled.A(1:end-1,1:end-1);
+% problem.q = ncvxProblemScaled.P(1:end-1,end).*scaledConstant;
+% problem.u = -ncvxProblemScaled.A(1:end-1,end).*scaledConstant;
+% problem.l = repmat(-inf,size(problem.u));
 
 
 function problem = scaleProblem(problem,D,E)
