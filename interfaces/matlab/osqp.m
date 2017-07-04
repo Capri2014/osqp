@@ -331,6 +331,18 @@ classdef osqp < handle
             end
             return;
         end
+        
+        %%
+        function work = workspace(this)
+            % WORKSPACE dump the C code solver workspace data
+            % For debugging purposes.
+
+            % Get workspace structure
+            work = osqp_mex('get_workspace', this.objectHandle);
+            return;
+
+        end
+
 
         %%
         function codegen(this, target_dir, varargin)
