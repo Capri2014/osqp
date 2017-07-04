@@ -24,17 +24,14 @@ uA *= 1e03
 qp = mpbpy.QuadprogProblem(P, q, A, lA, uA)
 
 
-osqp_opts = {'rho': 10.,
+osqp_opts = {'rho': 0.1,
              'auto_rho': False,
              'sigma': 1e-06,
-            #  'eps_rel': 1e-08,
-            #  'eps_abs': 1e-08,
+             'alpha': 1.6,
              'scaled_termination': False,
              'early_terminate_interval': 1,
              'polish': False,
-             'scaling': True,
-             'scaling_iter': 15,
-             'max_iter': 2500,
+             'max_iter': 10,
              'verbose': True
              }
 
