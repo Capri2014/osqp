@@ -1082,6 +1082,16 @@ class OSQP(object):
         # Get x, z, y from q
         x, z, y = self.xzy_from_q(q)
 
+        # DEBUG
+        # print("x = ", end=''); print(x)
+        # print("z = ", end=''); print(z)
+        # print("y = ", end=''); print(y)
+        # q_temp = self.q_from_xzy(x, z, y)
+        # x, z, y = self.xzy_from_q(q_temp)
+        # print("x = ", end=''); print(x)
+        # print("z = ", end=''); print(z)
+        # print("y = ", end=''); print(y)
+
         # Admm steps
         # First step: update \tilde{x} and \tilde{z}
         xz_tilde = self.update_xz_tilde(x, z, y)
