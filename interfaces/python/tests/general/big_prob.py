@@ -4,23 +4,23 @@ import scipy.sparse as sparse
 import scipy as sp
 import numpy as np
 import mathprogbasepy as mpbpy
-sp.random.seed(3)
+sp.random.seed(5)
 
-n = 200
-m = 1000
-# A = sparse.random(m, n, density=0.9, format='csc')
-# lA = -sp.rand(m) * 2.
-# uA = sp.rand(m) * 2.
+n = 20
+m = 100
+A = sparse.random(m, n, density=0.9, format='csc')
+lA = -sp.rand(m) * 2.
+uA = sp.rand(m) * 2.
 
 
-A = sparse.eye(n).tocsc()
-lA = -sp.rand(n)
-uA = lA + 0.1
+# A = sparse.eye(n).tocsc()
+# lA = -sp.rand(n)
+# uA = lA + 0.1
 # uA = np.inf * np.ones(n)
 
 P = sparse.random(n, n, density=0.9, format='csc')
 P = P.dot(P.T)
-q = 1000 * sp.randn(n)
+q = sp.randn(n)
 
 
 # A *= 1e03
@@ -30,7 +30,7 @@ q = 1000 * sp.randn(n)
 qp = mpbpy.QuadprogProblem(P, q, A, lA, uA)
 
 
-osqp_opts = {'rho': 10.,
+osqp_opts = {'rho': 1.,
              'auto_rho': False,
              'sigma': 1e-06,
              'alpha': 1.0,
@@ -45,7 +45,7 @@ model = osqp.OSQP()
 model.setup(P=P, q=q, A=A, l=lA, u=uA, **osqp_opts)
 res_osqp = model.solve()
 
-osqp_opts['line_search'] = True
+# osqp_opts['line_search'] = True
 
 # qp.solve(solver=GUROBI)
 res_purepy = qp.solve(solver=mpbpy.OSQP_PUREPY, **osqp_opts)
