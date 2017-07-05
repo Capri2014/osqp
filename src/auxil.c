@@ -708,6 +708,12 @@ c_int validate_settings(const OSQPSettings * settings){
         #endif
         return 1;
     }
+    if (settings->linsys_solver != SUITESPARSE_LDL){
+        #ifdef PRINTING
+        c_print("linsys_solver must be SUITESPARSE_LDL\n");
+        #endif
+        return 1;
+    }
     if (settings->verbose != 0 && settings->verbose != 1) {
         #ifdef PRINTING
         c_print("verbose must be either 0 or 1\n");
