@@ -36,7 +36,9 @@ n_unsolved = 0
 # Solve all Maroz Meszaros problems
 for f in lst_probs:
 
-    if f[:-4] == 'QAFIRO':
+    # if f[:-4] == 'QAFIRO':
+    if f[:-4] == 'CVXQP1_S':
+    # if f[:-4] == 'CVXQP1_S':
     # if f[:-4] == 'DUALC1':
     # if f[:-4] == 'CVXQP1_M':
     # if f[:-4] == 'AUG2DCQP':
@@ -127,7 +129,11 @@ for f in lst_probs:
 
         s = osqp.OSQP()
         s.setup(P, q, A, l, u,
+                rho=1000.,
+                auto_rho=False,
                 verbose=True,
+                scaled_termination=False,
+                # line_search=True,
                 max_iter=2500)
                 # early_terminate_interval=1)
         res = s.solve()

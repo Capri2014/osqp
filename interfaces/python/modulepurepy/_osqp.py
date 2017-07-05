@@ -1277,7 +1277,7 @@ class OSQP(object):
 
         # Plot norm of q
         import matplotlib.pylab as plt
-        fig = plt.figure()
+        fig = plt.figure(1)
         ax = fig.add_subplot(111)
         ax.set_ylabel(r'$\|q_{k+1} - q_{k}\|$')
         plt.semilogy(self.work.norm_rk)
