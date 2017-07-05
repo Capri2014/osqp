@@ -391,8 +391,9 @@ class OSQP(object):
 
             # Ruiz equilibration
             for j in range(n + m):
-                norm_col_j = la.norm(np.asarray(KKT[:, j].todense()),
-                                            np.inf)
+                norm_col_j = spspa.linalg.norm(KKT[:, j], np.inf)
+                # norm_col_j = la.norm(np.asarray(KKT[:, j].todense()),
+                #                             np.inf)
                 #  print("norm col %i = %.4e" % (j, norm_col_j))
                 #  norm_row_j = la.norm(KKT_temp[j, :].A1, np.inf)
                 #  print("norm row %i = %.4e" % (j, norm_row_j))
@@ -1117,15 +1118,16 @@ class OSQP(object):
         # Perform one operator iteration
         q_next = self.operator_T(q)
 
-        # Store norm of q for plotting
-        self.work.norm_rk.append(la.norm(q_next - q))
-
+        '''
+        Convert q back to x, z, y
+        '''
         # Get new x, y, z
         self.work.x, self.work.z, self.work.y = self.xzy_from_q(q_next)
 
         # Get deltas
         self.work.delta_x = self.work.x - self.work.x_prev
         self.work.delta_y = self.work.y - self.work.y_prev
+
 
     def alpha_acceleration(self):
         """
@@ -1203,8 +1205,8 @@ class OSQP(object):
                     q_next = q_temp
 
                     # Store norm of q for plotting
-                    self.work.norm_rk.pop()   # Remove last element
-                    self.work.norm_rk.append(la.norm(q_next - q))
+                    self.work.norm_delta_q.pop()   # Remove last element
+                    self.work.norm_delta_q.append(la.norm(q_next - q))
                     break
 
                 # Increase alpha
@@ -1234,6 +1236,38 @@ class OSQP(object):
             self.work.delta_x = self.work.x - self.work.x_prev
             self.work.delta_y = self.work.y - self.work.y_prev
 
+    def store_plotting_vars(self):
+        """
+        Store variables to plot
+        """
+
+        # Get variables q, q_prev, q_next
+        q_prev = self.q_from_xzy(self.work.x_prev_prev,
+                                 self.work.z_prev_prev,
+                                 self.work.y_prev_prev)
+        q = self.q_from_xzy(self.work.x_prev,
+                            self.work.z_prev,
+                            self.work.y_prev)
+        q_next = self.q_from_xzy(self.work.x,
+                                 self.work.z,
+                                 self.work.y)
+
+        # Store norm of q for plotting
+        self.work.norm_delta_q.append(la.norm(q_next - q))
+
+        # Store cos angle delta_qk and delta_qk+1
+        delta_q = q - q_prev
+        delta_q_next = q_next - q
+        cos_angle_delta_q = 0.0
+        if la.norm(delta_q) > 1e-09 and la.norm(delta_q_next) > 1e-09:
+            self.work.cos_angle_delta_q.append(delta_q_next.dot(delta_q) /
+                                               (la.norm(delta_q) *
+                                                la.norm(delta_q_next)))
+        # Compute primal dual residual ratio
+        pri_res = self.compute_pri_res(0)
+        dua_res = self.compute_dua_res(0)
+        self.work.residuals_ratio.append(pri_res/dua_res)
+
     def solve(self):
         """
         Solve QP problem using OSQP
@@ -1249,8 +1283,10 @@ class OSQP(object):
         if not self.work.settings.warm_start:
             self.cold_start()
 
-        # DEBUG:
-        self.work.norm_rk = []
+        # PLOTTING:
+        self.work.norm_delta_q = []
+        self.work.cos_angle_delta_q = []
+        self.work.residuals_ratio = []
 
         # ADMM algorithm
         for iter in range(1, self.work.settings.max_iter + 1):
@@ -1260,6 +1296,8 @@ class OSQP(object):
             if self.work.settings.line_search:
                 # Perform acceleration (if necessary)
                 self.alpha_acceleration()
+
+            self.store_plotting_vars()
 
             # Check algorithm termination
             if self.work.settings.early_terminate:
@@ -1274,18 +1312,6 @@ class OSQP(object):
                 # Break if converged
                 if self.check_termination():
                     break
-
-        # Plot norm of q
-        import matplotlib.pylab as plt
-        fig = plt.figure(1)
-        ax = fig.add_subplot(111)
-        ax.set_ylabel(r'$\|q_{k+1} - q_{k}\|$')
-        plt.semilogy(self.work.norm_rk)
-        ax.set_xlim([0, self.work.settings.max_iter])
-        plt.grid()
-        plt.tight_layout()
-        plt.show(block=False)
-        # import ipdb; ipdb.set_trace()
 
         if not self.work.settings.early_terminate:
             # Update info
@@ -1336,6 +1362,43 @@ class OSQP(object):
         # Eliminate first run flag
         if self.work.first_run:
             self.work.first_run = 0
+
+        '''
+        Plotting
+        '''
+        import matplotlib.pylab as plt
+
+        # Plot norm of q
+        fig = plt.figure(1)
+        ax = fig.add_subplot(311)
+        ax.set_ylabel(r'$\|q_{k+1} - q_{k}\|$')
+        plt.semilogy(self.work.norm_delta_q)
+        # ax.set_xlim([0, self.work.settings.max_iter])
+        plt.grid()
+        plt.tight_layout()
+        plt.show(block=False)
+
+        # Plot cos_angle_delta_q
+        # fig = plt.figure(2)
+        ax = fig.add_subplot(312)
+        ax.set_ylabel(r'$\|cos(delta_{q_next}, delta_q)\|$')
+        plt.plot(self.work.cos_angle_delta_q)
+        # ax.set_xlim([0, self.work.settings.max_iter])
+        plt.grid()
+        plt.tight_layout()
+        plt.show(block=False)
+
+        # Plot residual ratio
+        # fig = plt.figure(3)
+        ax = fig.add_subplot(313)
+        ax.set_ylabel(r'$\|r_{pri} / r_{dua}\|$')
+        plt.semilogy(self.work.residuals_ratio)
+        # ax.set_xlim([0, self.work.settings.max_iter])
+        plt.grid()
+        plt.tight_layout()
+        plt.show(block=False)
+
+
 
         # Store results structure
         return results(self.work.solution, self.work.info)

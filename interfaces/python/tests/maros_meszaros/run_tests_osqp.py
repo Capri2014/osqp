@@ -37,7 +37,6 @@ n_unsolved = 0
 for f in lst_probs:
 
     # if f[:-4] == 'QAFIRO':
-    if f[:-4] == 'CVXQP1_S':
     # if f[:-4] == 'CVXQP1_S':
     # if f[:-4] == 'DUALC1':
     # if f[:-4] == 'CVXQP1_M':
@@ -48,7 +47,7 @@ for f in lst_probs:
     # if f[:-4] == 'CONT-101':
     # if f[:-4] == 'CONT-300':
     # if True:
-    # if f[:-4] == 'STADAT1':
+    if f[:-4] == 'STADAT1':
     # if f[:-4] == 'AUG3D':
     # if f[:-4] == 'QSHIP04S':
 
@@ -132,7 +131,7 @@ for f in lst_probs:
                 rho=1000.,
                 auto_rho=False,
                 verbose=True,
-                scaled_termination=False,
+                scaled_termination=True,
                 # line_search=True,
                 max_iter=2500)
                 # early_terminate_interval=1)
