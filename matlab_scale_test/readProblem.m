@@ -5,15 +5,16 @@ function problem = readProblem(filename, readOptions)
 
 %Configure the default settings
 p = inputParser;
-addParameter(p,'makeOneSided',      false);
-addParameter(p,'primalPreScaling',  false);
-addParameter(p,'dualPreScaling',    false);
-addParameter(p,'perfectScaling',    false);
-addParameter(p,'nonConvexScaling',  false);
-addParameter(p,'manualScaling',     false);
-addParameter(p,'primalPreScalingNorm',  2);
-addParameter(p,'dualPreScalingNorm',    2);
-addParameter(p,'ruizNorm',              2);
+addParameter(p,'makeOneSided',              false);
+addParameter(p,'primalPreScaling',          false);
+addParameter(p,'dualPreScaling',            false);
+addParameter(p,'perfectScaling',            false);
+addParameter(p,'nonConvexScaling',          false);
+addParameter(p,'nonConvexScalingOneSided',   true);
+addParameter(p,'manualScaling',             false);
+addParameter(p,'primalPreScalingNorm',          2);
+addParameter(p,'dualPreScalingNorm',            2);
+addParameter(p,'ruizNorm',                      2);
 
 %update from external options
 parse(p,readOptions);
@@ -52,7 +53,7 @@ if(readOptions.perfectScaling)
 end
 
 if(readOptions.nonConvexScaling)
-   problem = doNonConvexScaling(problem,readOptions.ruizNorm);
+   problem = doNonConvexScaling(problem,readOptions.ruizNorm, readOptions.nonConvexScalingOneSided);
 end
 
 if(readOptions.manualScaling)
@@ -158,27 +159,35 @@ D = S(1:n,1:n); E = S(n+2:end,n+2:end);
 problem = scaleProblem(problem,D,E);
 
 
-function problem = doNonConvexScaling(problem,ruizNorm)
+function problem = doNonConvexScaling(problem,ruizNorm,oneSideFlag)
 
 %rewrite the problem so that the linear cost and linear bounding
 %vectors all get absorbed into the matrix problem data
 
-%make sure it is one sided
-problem = makeOneSided(problem);
-oneSidedProblem = problem; %debug
+%make it oned sided if needed
+if(oneSideFlag)
+	problem = makeOneSided(problem);
+end
 
 %make a nonconvex QP by adding one variable with unit cost and size
 P = [problem.P problem.q; problem.q' 0];
-A = [problem.A -problem.u];
 q = [problem.q.*0;0];
 
-%constraint last variable to be one
+if(oneSideFlag)
+    %if the problem has been made one sided, use u as the RHS
+    A = [problem.A -problem.u];
+else
+    %otherwise, use the smallest L/R value
+    m = min(abs(problem.l),abs(problem.u));
+    A = [problem.A m];
+end
+
+%constrain last variable to be one
 A(end+1,end) = 1;
 u = [problem.u; 1];
 l = [problem.l; 1];
 
 %deal this into a new (non-convex) problem
-%deal it all into a new problem
 ncvxProblem.P = P;
 ncvxProblem.q = q;
 ncvxProblem.A = A;
@@ -188,8 +197,8 @@ ncvxProblem.l = l;
 %scale it as if it were a normal problem
 [ncvxProblemScaled,D,E] = doManualScaling(ncvxProblem, ruizNorm);
 
-%now eliminate the final variable that was making it non-convex
-problem = scaleProblem(oneSidedProblem,D(1:end-1,1:end-1),E(1:end-1,1:end-1));
+%now apply the scaling to the original problem
+problem = scaleProblem(problem,D(1:end-1,1:end-1),E(1:end-1,1:end-1));
 
 %NB : final line above is the same as
 % scaledConstant = ncvxProblemScaled.u(end)./ncvxProblemScaled.A(end,end);

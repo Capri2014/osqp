@@ -3,7 +3,7 @@ function makeFittingPlots(targetDir)
 [stats,optStats,optStatsUnFlat] = loadPlottingData(targetDir);
 
 %% 
-l = [1e-3,1e5];
+l = [1e-5,1e4];
 figure(1); clf
 semilogy(optStats.rhoOpt); hold on
 semilogy(optStats.rhoGoodLower,'k-.');
@@ -11,31 +11,15 @@ semilogy(optStats.rhoGoodUpper,'k-.');
 ylim(l)
 
 yyaxis 'right'; hold on  
-val1 =  ( (optStats.trP_s./optStats.n) + optStats.sigma)   ./   (optStats.froA_s ./ min(optStats.m - optStats.nEqualities,optStats.n));
-%val1 =  (optStats.trP_s./optStats.n)    ./   (optStats.froA_s ./ optStats.m) ;
-val1 = ( (optStats.trP_s ) )   ./   (optStats.froA_s );
-val2 = 1./(optStats.normq_uinf + 1);
-valNorm2_s = (optStats.duaNorm_s2./optStats.priNorm_s2);
-valNorm1_s = (optStats.duaNorm_s1./optStats.priNorm_s1);
-valNormInf_s = (optStats.duaNorm_sinf./optStats.priNorm_sinf);
-valNorm2_u = (optStats.duaNorm_u2./optStats.priNorm_u2);
-valNorm1_u = (optStats.duaNorm_u1./optStats.priNorm_u1);
-valNormInf_u = (optStats.duaNorm_uinf./optStats.priNorm_uinf);
+val1 = 1./((optStats.froA_s) ./ optStats.n);
+val2 = 2*(optStats.duaNorm_s2)./sqrt(optStats.priNorm_s2);
+val3 = (optStats.duaNorm_s2);
+optStats
 
-valNorm_s_P = max(optStats.normA2_s,1);
-valNorm_s_D = max(max(optStats.normP2_s,optStats.normA2_s));
-valNorm_u_P = max(optStats.normA2_u,1);
-valNorm_u_D = max(max(optStats.normP2_u,optStats.normA2_u));
 
-%semilogy((valNorm2_s),'-.');
-%semilogy(valNorm2,'-.k');
-%semilogy(optStats.froA_s,'k-.');
-semilogy((optStats.duaNorm_s2)./sqrt(optStats.priNorm_s2),'r-.');
-%semilogy(sqrt(optStats.normq_s2.*valNorm2_s),'r-.');
-%semilogy((optStats.normq_sinf),'r-.');
-%semilogy(1./optStats.normEinv_2);
-%%semilogy((valNormInf),'-.');
-%semilogy(1./optStats.oneNormCond_d,'-.')
+semilogy(val1,'b-.');
+semilogy(val2,'r-.');
+semilogy(val3,'g-.');
 set(gca,'yscale','log')
 ylim(l)
 grid on
@@ -82,22 +66,24 @@ title('Residual ratios vs \rho miscalibration');
 
 
 %%
-figure(4);clf
+figure(4); clf
+tags = {%'normD_1',...
+        %'normD_inf',...%'normE_1',...%'normE_inf',...%'normDinv_1',...
+        'normq_s1',... %'normq_sinf',...%'normq_u1',...%'normA2_s',...'froA_s',...
+        'condA_s',... %'condNumberKKT_s'...%'infNormCond_s'
+        'normA2_s',...
+        'froA_s',
+        };
+    
+for i = 1:(length(tags))
+    h(i) = semilogy(getfield(optStats,tags{i})); hold on
+end
+legend(tags{:});
+%semilogy(optStats.condA_s,'k*'); hold on
+%semilogy(optStats.mnormq_s1,'k*'); hold on
 
-f = flattenStructArray(stats);
-idx = f.wasSolvable & ~f.rhoOptIsExtreme;% & f.rho < 100 & f.rho > 1e-2 ;
 
-idxs = f.status == 1;
-idxu = f.status == 0;
 
-x = f.rho./f.rhoOpt;
-y = (f.priNorm_s2./f.duaNorm_s2);
-loglog(x(idx & idxs),y(idx & idxs),'b.'), hold on
-loglog(x(idx & idxu),y(idx & idxu),'r.')
-grid on
-l = [1e-8,1e8];
-xlim(l); ylim(l);
-title('Primal norm vs dual norm');
 
 %%
 figure(5);
@@ -108,17 +94,17 @@ grid on
 title('Iteration counts (sorted)');
 
 %%
-figure(6);clf
-
-x = optStats.iter;
-[m,idxm] = sort(optStats.m);
-[n,idxn] = sort(optStats.n);
-plot(n,x(idxn),'bx');
-grid on
-yyaxis 'right'; hold on  
-plot(m,x(idxm),'rx');
-title('Iteration counts vs variables (red) and contraints (blue)');
-
+% figure(6);clf
+% 
+% x = optStats.iter;
+% [m,idxm] = sort(optStats.m);
+% [n,idxn] = sort(optStats.n);
+% plot(n,x(idxn),'bx');
+% grid on
+% yyaxis 'right'; hold on  
+% plot(m,x(idxm),'rx');
+% title('Iteration counts vs variables (red) and contraints (blue)');
+% 
 
 %%
 %print out some statistics

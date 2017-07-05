@@ -17,7 +17,7 @@ sizes  = [d.bytes];
 [~,idx] = sort(sizes);
 fnames  = fnames(idx(1:450)); %subset of problems, in order of size
 
-for i = 1:length(fnames)
+parfor i = 1:length(fnames)
     theFile = fullfile(readDir,fnames{i});
     [~,root,ext] = fileparts(theFile);
     target  = fullfile(targetDir,[root '_sol',ext]);
@@ -31,12 +31,16 @@ for i = 1:length(fnames)
         [stats,optStats] = makeRecord(theFile,rhoVals,sigVals,osqpOptions,readOptions);
         stats.filename = fnames{i};
         optStats.filename = fnames{i};
-        save(target,'stats','optStats');
+        export_file(target,stats,optStats);
     end
     
 end
 
 
 
+function export_file(target,stats,optStats)
+
+%workaround indirection function to prevent parfor loop from bombing
+save(target,'stats','optStats');
 
 
