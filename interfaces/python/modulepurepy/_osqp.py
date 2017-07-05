@@ -1136,7 +1136,7 @@ class OSQP(object):
         ALPHA_MAX = 1000
         ALPHA_RED = 0.7
         EPS_ACCELERATION = 1e-05
-        EPS_ACTIVATION_ACCELERATION = 1e-06
+        EPS_ACTIVATION_ACCELERATION = 1e-05
 
         # Get current vectors
         x_prev_prev = self.work.x_prev_prev
@@ -1201,6 +1201,10 @@ class OSQP(object):
                 if condition_acc:
                     print("better alpha found! alpha = %.4f" % alpha)
                     q_next = q_temp
+
+                    # Store norm of q for plotting
+                    self.work.norm_rk.pop()   # Remove last element
+                    self.work.norm_rk.append(la.norm(q_next - q))
                     break
 
                 # Increase alpha

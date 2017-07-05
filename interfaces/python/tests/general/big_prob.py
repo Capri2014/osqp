@@ -8,13 +8,19 @@ sp.random.seed(3)
 
 n = 200
 m = 1000
-A = sparse.random(m, n, density=0.9, format='csc')
-lA = -sp.rand(m) * 2.
-uA = sp.rand(m) * 2.
+# A = sparse.random(m, n, density=0.9, format='csc')
+# lA = -sp.rand(m) * 2.
+# uA = sp.rand(m) * 2.
+
+
+A = sparse.eye(n).tocsc()
+lA = -sp.rand(n)
+uA = lA + 0.1
+# uA = np.inf * np.ones(n)
 
 P = sparse.random(n, n, density=0.9, format='csc')
 P = P.dot(P.T)
-q = sp.randn(n)
+q = 1000 * sp.randn(n)
 
 
 # A *= 1e03
@@ -24,7 +30,7 @@ q = sp.randn(n)
 qp = mpbpy.QuadprogProblem(P, q, A, lA, uA)
 
 
-osqp_opts = {'rho': 1.0,
+osqp_opts = {'rho': 10.,
              'auto_rho': False,
              'sigma': 1e-06,
              'alpha': 1.0,
