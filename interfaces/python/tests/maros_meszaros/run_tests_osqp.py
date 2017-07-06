@@ -74,7 +74,7 @@ def scale_constraints(problem):
     problem.u = E.dot(m.u)
     problem.A = E.dot(m.A).tocsc()
 
-    
+
 '''
 Main script
 '''
@@ -109,7 +109,7 @@ for f in lst_probs:
     # if True:
     # if f[:-4] == 'QPCBOEI2':
     # if f[:-4] == 'AUG3D':
-    # if f[:-4] == 'QSHIP04S':
+    if f[:-4] == 'QSHIP04S':
 
         problem = load_maros_meszaros_problem(prob_dir + "/" + f)  # Load problem
 
@@ -123,12 +123,12 @@ for f in lst_probs:
 
         s = osqp.OSQP()
         s.setup(problem.P, problem.q, problem.A, problem.l, problem.u,
-                rho=0.1,
+                rho=1.,
                 auto_rho=False,
                 verbose=True,
                 scaled_termination=True,
                 # line_search=True,
-                max_iter=2500)
+                max_iter=1000)
                 # early_terminate_interval=1)
         res = s.solve()
 

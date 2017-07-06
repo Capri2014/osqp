@@ -1381,7 +1381,7 @@ class OSQP(object):
         # Plot cos_angle_delta_q
         # fig = plt.figure(2)
         ax = fig.add_subplot(312)
-        ax.set_ylabel(r'$\|\cos(\delta_{q_{next}}, \delta_q)\|$')
+        ax.set_ylabel(r'$\|\cos(\delta_{q_{k+1}}, \delta_{q_{k}})\|$')
         plt.plot(self.work.cos_angle_delta_q)
         # ax.set_xlim([0, self.work.settings.max_iter])
         plt.grid()
