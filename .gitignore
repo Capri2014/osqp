@@ -3,6 +3,9 @@
 # Out folder
 out/
 
+#solution files from matlab testing
+matlab_scale_test/solutions/
+
 # Prerequisites
 *.d
 
