@@ -227,7 +227,7 @@ class settings(object):
         self.scaled_termination = kwargs.pop('scaled_termination', False)
         self.early_terminate = kwargs.pop('early_terminate', True)
         self.early_terminate_interval = kwargs.pop('early_terminate_interval', 25)
-        self.warm_start = kwargs.pop('warm_start', False)
+        self.warm_start = kwargs.pop('warm_start', True)
         self.polish = kwargs.pop('polish', True)
         self.pol_refine_iter = kwargs.pop('pol_refine_iter', 3)
         self.auto_rho = kwargs.pop('auto_rho', True)
@@ -1274,7 +1274,7 @@ class OSQP(object):
         Check if rho has to be changed and in case change it
         """
 
-        CHANGE_RHO_TOL = 1e-04
+        CHANGE_RHO_TOL = 1e-05
 
         # Get variables q, q_prev, q_next
         q_prev = self.q_from_xzy(self.work.x_prev_prev,
@@ -1342,7 +1342,7 @@ class OSQP(object):
             self.store_plotting_vars()
 
             # Update rho?
-            # self.change_rho()
+            self.change_rho()
 
             # Check algorithm termination
             if self.work.settings.early_terminate:
