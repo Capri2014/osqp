@@ -672,7 +672,7 @@ class OSQP(object):
         # New y
         return y + rho * (alpha * z_tilde + (1. - alpha) * z - z_new)
 
-    def compute_pri_res(self, polish):
+    def compute_pri_res(self, polish, scaled_termination):
         """
         Compute primal residual ||Ax - z||
         """
@@ -684,12 +684,12 @@ class OSQP(object):
         else:
             pri_res = self.work.data.A.dot(self.work.x) - self.work.z
 
-        if self.work.settings.scaling and not self.work.settings.scaled_termination:
+        if self.work.settings.scaling and not scaled_termination:
             pri_res = self.work.scaling.Einv.dot(pri_res)
 
         return la.norm(pri_res, np.inf)
 
-    def compute_dua_res(self, polish):
+    def compute_dua_res(self, polish, scaled_termination):
         """
         Compute dual residual ||Px + q + A'y||
         """
@@ -702,7 +702,7 @@ class OSQP(object):
                 self.work.data.q +\
                 self.work.data.A.T.dot(self.work.y)
 
-        if self.work.settings.scaling and not self.work.settings.scaled_termination:
+        if self.work.settings.scaling and not scaled_termination:
             dua_res = self.work.scaling.Dinv.dot(dua_res)
 
         return la.norm(dua_res, np.inf)
@@ -839,13 +839,13 @@ class OSQP(object):
         """
         if polish == 1:
             self.work.pol.obj_val = self.work.data.objval(self.work.pol.x)
-            self.work.pol.pri_res = self.compute_pri_res(1)
-            self.work.pol.dua_res = self.compute_dua_res(1)
+            self.work.pol.pri_res = self.compute_pri_res(1, self.work.settings.scaled_termination)
+            self.work.pol.dua_res = self.compute_dua_res(1, self.work.settings.scaled_termination)
         else:
             self.work.info.iter = iter
             self.work.info.obj_val = self.work.data.objval(self.work.x)
-            self.work.info.pri_res = self.compute_pri_res(0)
-            self.work.info.dua_res = self.compute_dua_res(0)
+            self.work.info.pri_res = self.compute_pri_res(0, self.work.settings.scaled_termination)
+            self.work.info.dua_res = self.compute_dua_res(0, self.work.settings.scaled_termination)
             self.work.info.solve_time = time.time() - self.work.timer
 
     def print_summary(self):
@@ -1260,13 +1260,55 @@ class OSQP(object):
         delta_q_next = q_next - q
         cos_angle_delta_q = 0.0
         if la.norm(delta_q) > 1e-09 and la.norm(delta_q_next) > 1e-09:
-            self.work.cos_angle_delta_q.append(delta_q_next.dot(delta_q) /
-                                               (la.norm(delta_q) *
-                                                la.norm(delta_q_next)))
+            cos_angle_delta_q = delta_q_next.dot(delta_q) / \
+                (la.norm(delta_q) * la.norm(delta_q_next))
+        self.work.cos_angle_delta_q.append(cos_angle_delta_q)
+
         # Compute primal dual residual ratio
-        pri_res = self.compute_pri_res(0)
-        dua_res = self.compute_dua_res(0)
+        pri_res = self.compute_pri_res(0, self.work.settings.scaled_termination)
+        dua_res = self.compute_dua_res(0, self.work.settings.scaled_termination)
         self.work.residuals_ratio.append(pri_res/dua_res)
+
+    def change_rho(self):
+        """
+        Check if rho has to be changed and in case change it
+        """
+
+        CHANGE_RHO_TOL = 1e-04
+
+        # Get variables q, q_prev, q_next
+        q_prev = self.q_from_xzy(self.work.x_prev_prev,
+                                 self.work.z_prev_prev,
+                                 self.work.y_prev_prev)
+        q = self.q_from_xzy(self.work.x_prev,
+                            self.work.z_prev,
+                            self.work.y_prev)
+        q_next = self.q_from_xzy(self.work.x,
+                                 self.work.z,
+                                 self.work.y)
+        # Check cos angle delta_qk and delta_qk+1
+        delta_q = q - q_prev
+        delta_q_next = q_next - q
+        cos_angle_delta_q = 0.0
+        if la.norm(delta_q) > 1e-09 and la.norm(delta_q_next) > 1e-09:
+            cos_angle_delta_q = delta_q_next.dot(delta_q) / \
+                (la.norm(delta_q) * la.norm(delta_q_next))
+
+        if cos_angle_delta_q > 1 - CHANGE_RHO_TOL:
+            pri_res = self.compute_pri_res(0, True)  # Scaled residual
+            dua_res = self.compute_dua_res(0, True)  # Scaled residual
+
+            # Compute residuals ratio
+            res_ratio = pri_res / dua_res
+
+            # Compute new rho
+            new_rho = self.work.settings.rho * np.sqrt(res_ratio)
+
+            # Print
+            print("New rho = %.2e" % new_rho)
+
+            # Update rho
+            self.update_rho(new_rho)
 
     def solve(self):
         """
@@ -1298,6 +1340,9 @@ class OSQP(object):
                 self.alpha_acceleration()
 
             self.store_plotting_vars()
+
+            # Update rho?
+            # self.change_rho()
 
             # Check algorithm termination
             if self.work.settings.early_terminate:

@@ -10,8 +10,8 @@ import os
 from utils.utils import load_maros_meszaros_problem
 import mathprogbasepy as mpbpy
 
-import osqppurepy as osqp
-# import osqp
+import osqppurepy as osqpurepy
+import osqp
 
 
 def constrain_scaling(s, min_val, max_val):
@@ -97,7 +97,7 @@ n_unsolved = 0
 for f in lst_probs:
 
     # if f[:-4] == 'QAFIRO':
-    # if f[:-4] == 'CVXQP1_S':
+    if f[:-4] == 'CVXQP1_S':
     # if f[:-4] == 'DUALC1':
     # if f[:-4] == 'CVXQP1_M':
     # if f[:-4] == 'AUG2DCQP':
@@ -109,7 +109,7 @@ for f in lst_probs:
     # if True:
     # if f[:-4] == 'QPCBOEI2':
     # if f[:-4] == 'AUG3D':
-    if f[:-4] == 'QSHIP04S':
+    # if f[:-4] == 'QSHIP04S':
 
         problem = load_maros_meszaros_problem(prob_dir + "/" + f)  # Load problem
 
@@ -121,16 +121,23 @@ for f in lst_probs:
         # Scale constraints
         # scale_constraints(problem)
 
+        settings = {'rho': 50.0,
+                    'auto_rho': False,
+                    'verbose': True,
+                    'scaled_termination': True,
+                    'polish': False,
+                    'early_terminate_interval': 1}
+
         s = osqp.OSQP()
         s.setup(problem.P, problem.q, problem.A, problem.l, problem.u,
-                rho=1.,
-                auto_rho=False,
-                verbose=True,
-                scaled_termination=True,
-                # line_search=True,
-                max_iter=1000)
-                # early_terminate_interval=1)
+                **settings)
         res = s.solve()
+
+        # Solve with purepy
+        s = osqpurepy.OSQP()
+        s.setup(problem.P, problem.q, problem.A, problem.l, problem.u,
+                **settings)
+        res_purepy = s.solve()
 
         p += 1
 

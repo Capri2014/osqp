@@ -4,10 +4,10 @@ import scipy.sparse as sparse
 import scipy as sp
 import numpy as np
 import mathprogbasepy as mpbpy
-sp.random.seed(10)
+sp.random.seed(11)
 
-n = 500
-m = 1000
+n = 100
+m = 200
 A = sparse.random(m, n, density=0.9, format='csc')
 lA = -sp.rand(m) * 2.
 uA = sp.rand(m) * 2.
@@ -30,11 +30,11 @@ q = sp.randn(n)
 qp = mpbpy.QuadprogProblem(P, q, A, lA, uA)
 
 
-osqp_opts = {'rho': 0.1,
+osqp_opts = {'rho': 1.,
              'auto_rho': False,
-             'sigma': 1e-06,
-             'alpha': 1.0,
-             'scaled_termination': True,
+            #  'sigma': 1e-06,
+            #  'alpha': 1.0,
+             'scaled_termination': False,
              'early_terminate_interval': 1,
              'polish': False,
              'max_iter': 2500,
