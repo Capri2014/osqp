@@ -393,7 +393,7 @@ class OSQP(object):
             for j in range(n + m):
                 norm_col_j = spspa.linalg.norm(KKT[:, j], np.inf)
                 # norm_col_j = la.norm(np.asarray(KKT[:, j].todense()),
-                #                             np.inf)
+                                            # np.inf)
                 #  print("norm col %i = %.4e" % (j, norm_col_j))
                 #  norm_row_j = la.norm(KKT_temp[j, :].A1, np.inf)
                 #  print("norm row %i = %.4e" % (j, norm_row_j))
@@ -1342,7 +1342,7 @@ class OSQP(object):
             self.store_plotting_vars()
 
             # Update rho?
-            self.change_rho()
+            # self.change_rho()
 
             # Check algorithm termination
             if self.work.settings.early_terminate:

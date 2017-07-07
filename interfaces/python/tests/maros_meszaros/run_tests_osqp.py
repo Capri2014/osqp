@@ -98,7 +98,8 @@ for f in lst_probs:
 
     # if f[:-4] == 'QAFIRO':
     # if f[:-4] == 'CVXQP1_S':
-    if f[:-4] == 'DUALC1':
+    # if f[:-4] == 'DUALC1':
+    if f[:-4] == 'PRIMAL4':
     # if f[:-4] == 'CVXQP1_M':
     # if f[:-4] == 'AUG2DCQP':
     # if f[:-4] == 'BOYD1':
@@ -136,12 +137,12 @@ for f in lst_probs:
         res = s.solve()
 
         # Solve with purepy
-        res_purepy = problem.solve(solver=mpbpy.OSQP_PUREPY, **settings)
+        # res_purepy = problem.solve(solver=mpbpy.OSQP_PUREPY, **settings)
 
-        # s = osqpurepy.OSQP()
-        # s.setup(problem.P, problem.q, problem.A, problem.l, problem.u,
-        #         **settings)
-        # res_purepy = s.solve()
+        s = osqpurepy.OSQP()
+        s.setup(problem.P, problem.q, problem.A, problem.l, problem.u,
+                **settings)
+        res_purepy = s.solve()
 
         p += 1
 
