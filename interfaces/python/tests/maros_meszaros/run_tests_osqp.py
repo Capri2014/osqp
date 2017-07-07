@@ -97,9 +97,9 @@ n_unsolved = 0
 for f in lst_probs:
 
     # if f[:-4] == 'QAFIRO':
-    # if f[:-4] == 'CVXQP1_S':
+    if f[:-4] == 'CVXQP1_S':
     # if f[:-4] == 'DUALC1':
-    if f[:-4] == 'PRIMAL4':
+    # if f[:-4] == 'PRIMAL4':
     # if f[:-4] == 'CVXQP1_M':
     # if f[:-4] == 'AUG2DCQP':
     # if f[:-4] == 'BOYD1':
@@ -123,7 +123,7 @@ for f in lst_probs:
         # scale_constraints(problem)
 
 
-        settings = {'rho': 1.,
+        settings = {'rho': 0.1,
                     'auto_rho': False,
                     'verbose': True,
                     'scaled_termination': False,

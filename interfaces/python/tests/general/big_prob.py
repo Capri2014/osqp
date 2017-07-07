@@ -4,14 +4,25 @@ import scipy.sparse as sparse
 import scipy as sp
 import numpy as np
 import mathprogbasepy as mpbpy
-# sp.random.seed(11)
+sp.random.seed(5)
 
-n = 10
-m = 500
-A = sparse.random(m, n, density=0.9, format='csc')
+n = 50
+m = 100
+A = sparse.random(m, n, density=0.4, format='csc')
 lA = -sp.rand(m) * 2.
-# uA = sp.rand(m) * 2.
-uA = None
+uA = sp.rand(m) * 2.
+
+
+n_eq = 15
+# eyeI = sparse.random(n_eq, n_eq, density=0.2)
+eyeI = sparse.eye(n_eq)
+A = sparse.vstack([A,
+                   sparse.hstack([eyeI, sparse.csc_matrix((n_eq, n - n_eq))])
+                   ])
+leq = np.random.rand(n_eq)
+ueq = leq
+lA = np.append(lA, leq)
+uA = np.append(uA, ueq)
 
 
 # A = sparse.eye(n).tocsc()
@@ -23,6 +34,10 @@ P = sparse.random(n, n, density=0.9, format='csc')
 P = P.dot(P.T)
 q = sp.randn(n)
 
+# Scaling
+# norm_q = np.linalg.norm(q)
+# P /= norm_q
+# q /= norm_q
 
 # A *= 1e03
 # lA *= 1e03
@@ -31,7 +46,7 @@ q = sp.randn(n)
 qp = mpbpy.QuadprogProblem(P, q, A, lA, uA)
 
 
-osqp_opts = {'rho': 1.,
+osqp_opts = {'rho': 0.1,
              'auto_rho': False,
             #  'sigma': 1e-06,
             #  'alpha': 1.0,

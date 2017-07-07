@@ -30,76 +30,6 @@ OSQP_NAN = 1e+20  # Just as placeholder. Not real value
 # Linear system solver options
 SUITESPARSE_LDL = 0
 
-
-# Auto rho (only linear function)
-# (old values)
-# AUTO_RHO_OFFSET = 1.07838081E-03
-# AUTO_RHO_SLOPE = 2.31511262
-
-#  AUTO_RHO_OFFSET = 0.0
-#  AUTO_RHO_SLOPE = 2.4474028467925546
-
-# Old (More complicated fit)
-# AUTO_RHO_BETA0 = 2.1877627217504649
-# AUTO_RHO_BETA1 = 0.57211669508170027
-# AUTO_RHO_BETA2 = -0.71622847416411806
-
-# New
-# AUTO_RHO_BETA0 = 2.9287845053694284
-# AUTO_RHO_BETA1 = 0.36309102743796728
-# AUTO_RHO_BETA2 = -0.59595092004777972
-
-# With regularization on v (1e-03)
-# AUTO_RHO_BETA0 = 4.7967320978661059
-# AUTO_RHO_BETA1 = -0.014575489596745135
-# AUTO_RHO_BETA2 = -0.38435004096785225
-
-# With regularization on v (1e-04)
-#  AUTO_RHO_BETA0 = 3.1723875550135223
-#  AUTO_RHO_BETA1 = 0.29811867735531827
-#  AUTO_RHO_BETA2 = -0.55976668580992439
-
-# With iter less than 20
-# AUTO_RHO_BETA0 = 6.4047899119449241
-# AUTO_RHO_BETA1 = -0.67858183687448892
-# AUTO_RHO_BETA2 = -0.037034234262609413
-
-# No regularization. interval [1, 1.2] (depends on traces)
-#  AUTO_RHO_BETA0 = 2.2377322735057317
-#  AUTO_RHO_BETA1 = 0.73909558577990619
-#  AUTO_RHO_BETA2 = -0.81428271821694909
-
-
-# only n and m, interval 2.0
-#  AUTO_RHO_BETA0 = 132.31670550204416
-#  AUTO_RHO_BETA1 = 3.6821990789623533
-#  AUTO_RHO_BETA2 = -5.3493318062852033
-
-#  # only n and m, interval 2.0
-#  AUTO_RHO_BETA0 = 99.46657940983809
-#  AUTO_RHO_BETA1 = 3.7594273667640685
-#  AUTO_RHO_BETA2 = -5.3658885099270002
-
-# only n and m, interval 1.5
-#  AUTO_RHO_BETA0 = 63.9204222926816
-#  AUTO_RHO_BETA1 = 4.2480325664123226
-#  AUTO_RHO_BETA2 = -5.7924560461638848
-
-
-#  AUTO_RHO_BETA0 = 1.0865058613182395
-#  AUTO_RHO_BETA1 = 0.12750326228757933
-#  AUTO_RHO_BETA2 = -0.65234442259175496
-
-AUTO_RHO_BETA0 = 0.43764484761141698
-AUTO_RHO_BETA1 = 0.26202391082629206
-AUTO_RHO_BETA2 = -0.46598879917320213
-
-
-
-AUTO_RHO_MAX = 1e06
-AUTO_RHO_MIN = 1e-06
-
-
 # Scaling
 SCALING_REG = 1e-08
 #  MAX_SCALING = 1e06
@@ -184,7 +114,7 @@ class settings(object):
     Attributes
     ----------
     -> These cannot be changed without running setup
-    rho  [1.6]                 - Step in ADMM procedure
+    # rho  [1.6]                 - Step in ADMM procedure
     sigma    [1e-06]           - Regularization parameter for polish
     scaling  [True]            - Prescaling/Equilibration
     scaling_iter [3]           - Number of Steps for Scaling Method
@@ -205,12 +135,12 @@ class settings(object):
     warm_start [False]                  - Reuse solution from previous solve
     polish  [True]                      - Solution polish
     pol_refine_iter  [3]                - Number of iterative refinement iterations
-    auto_rho  [True]                    - Automatic rho computation
+    # auto_rho  [True]                    - Automatic rho computation
     """
 
     def __init__(self, **kwargs):
 
-        self.rho = kwargs.pop('rho', 0.1)
+        # self.rho = kwargs.pop('rho', 0.1)
         self.sigma = kwargs.pop('sigma', 1e-06)
         self.scaling = kwargs.pop('scaling', True)
         self.scaling_iter = kwargs.pop('scaling_iter', 15)
@@ -230,7 +160,7 @@ class settings(object):
         self.warm_start = kwargs.pop('warm_start', True)
         self.polish = kwargs.pop('polish', True)
         self.pol_refine_iter = kwargs.pop('pol_refine_iter', 3)
-        self.auto_rho = kwargs.pop('auto_rho', True)
+        # self.auto_rho = kwargs.pop('auto_rho', True)
 
 
 
@@ -322,11 +252,11 @@ class linsys_solver(object):
         Initialize structure for KKT system solution
         """
         # Construct reduced KKT matrix
+        rho_inv = work.settings.rho_inv
         KKT = spspa.vstack([
               spspa.hstack([work.data.P + work.settings.sigma *
                             spspa.eye(work.data.n), work.data.A.T]),
-              spspa.hstack([work.data.A,
-                           -1./work.settings.rho * spspa.eye(work.data.m)])])
+              spspa.hstack([work.data.A, -rho_inv])])
 
         # Initialize structure
         self.kkt_factor = spla.splu(KKT.tocsc())
@@ -488,52 +418,44 @@ class OSQP(object):
         """
         Automatically compute rho value
         """
+        RHO_MIN = 1e-06
+        RHO_MAX = 1e06
+        RHO_TOL = 1e-08
+        RHO_MID = 0.1
 
-        if self.work.data.m == 0:
-            self.work.settings.rho = AUTO_RHO_MAX
-
-        n = self.work.data.n
         m = self.work.data.m
-        sigma = self.work.settings.sigma
-        #  self.work.settings.rho = AUTO_RHO_BETA0 * \
-        #      np.power(n, AUTO_RHO_BETA1) * \
-        #      np.power(m, AUTO_RHO_BETA2)
+        rho_vec = np.zeros(m)
 
+        # Define index of equality constraints
+        ineq_idx = np.zeros(m, dtype=bool)
 
-        #  Old stuff with traces
-        # Compute tr(P)
-        trP = self.work.data.P.diagonal().sum()
+        # Get lower and upper bounds
+        l = self.work.data.l
+        u = self.work.data.u
 
-        #  Compute tr(AtA) = fro(A) ^ 2
-        trAtA = spspa.linalg.norm(self.work.data.A) ** 2
-#
+        for i in range(m):
+            if np.abs(l[i]) >= OSQP_INFTY*1e-06 and np.abs(u[i]) >= OSQP_INFTY*1e-06:
+                # Unconstrained
+                rho_vec[i] = RHO_MIN
+            elif np.abs(u[i] - l[i]) >= OSQP_INFTY * 1e-06:
+                # One sided constraint
+                rho_vec[i] = RHO_MID
+                ineq_idx[i] = True
+            elif np.abs(u[i] - l[i]) < 1e-08:
+                # Equality constraint
+                rho_vec[i] = RHO_MAX
+            else:
+                # Range constraint
+                # rho_vec[i] = 1000. / (u[i] - l[i])
+                rho_vec[i] = RHO_MID
+                ineq_idx[i] = True
 
-        # DEBUG: saturate values of norms
-        # trP = np.maximum(trP, 1e-03)
-        # trAtA = np.maximum(trAtA, 1e-03)
+            # Constrain between maximum and minimum
+            rho_vec[i] = np.maximum(np.minimum(rho_vec[i], RHO_MAX), RHO_MIN)
 
-        #  self.work.settings.rho = AUTO_RHO_BETA0 * \
-        #      np.power(trP, AUTO_RHO_BETA1) * \
-        #      np.power(trAtA, AUTO_RHO_BETA2)
-
-
-        self.work.settings.rho = AUTO_RHO_BETA0 * \
-                np.power((trP + sigma * n)/n, AUTO_RHO_BETA1) * \
-                np.power((trAtA)/m, AUTO_RHO_BETA2)
-
-        #  import ipdb; ipdb.set_trace()
-        # Old linear ratio
-        # # Compute ratio
-        # ratio = trP / trAtA
-        #
-        # # Compute rho
-        # self.work.settings.rho = AUTO_RHO_OFFSET + AUTO_RHO_SLOPE * ratio
-
-        # Constrain rho between max and min
-        self.work.settings.rho = \
-            np.minimum(np.maximum(self.work.settings.rho,
-                                  AUTO_RHO_MIN),
-                       AUTO_RHO_MAX)
+        self.work.settings.rho = spspa.diags(rho_vec)
+        self.work.settings.rho_inv = spspa.diags(np.reciprocal(rho_vec))
+        self.work.ineq_idx = ineq_idx
 
     def print_setup_header(self, data, settings):
         """Print solver header
@@ -555,11 +477,11 @@ class OSQP(object):
             (settings.eps_abs, settings.eps_rel))
         print("          eps_prim_inf = %.2e, eps_dual_inf = %.2e," % \
             (settings.eps_prim_inf, settings.eps_dual_inf))
-        print("          rho = %.2e " % settings.rho, end='')
-        if settings.auto_rho:
-            print("(auto)")
-        else:
-            print("")
+        # print("          rho = %.2e " % settings.rho, end='')
+        # if settings.auto_rho:
+        #     print("(auto)")
+        # else:
+        #     print("")
         print("          sigma = %.2e, alpha = %.2e," % \
             (settings.sigma, settings.alpha))
         print("          max_iter = %d" % settings.max_iter)
@@ -579,6 +501,7 @@ class OSQP(object):
             print("polish: on")
         else:
             print("polish: off")
+
         print("")
 
     def print_header(self):
@@ -613,7 +536,7 @@ class OSQP(object):
         """
         n = self.work.data.n
         m = self.work.data.m
-        rho = self.work.settings.rho
+        rho_inv = self.work.settings.rho_inv
         sigma = self.work.settings.sigma
 
         # Preallocate xz_tilde
@@ -621,7 +544,7 @@ class OSQP(object):
 
         # Compute rhs and store it in xz_tilde
         rhs = np.append(sigma * x - self.work.data.q,
-                        z - (1./rho) * y)
+                        z - rho_inv.dot(y))
 
         # Solve linear system
         sol = self.work.linsys_solver.solve(rhs)
@@ -629,7 +552,7 @@ class OSQP(object):
         # Update z_tilde
         x_tilde = sol[:n]
         v = sol[n:]
-        z_tilde = z + (1./rho) * (v - y)
+        z_tilde = z + rho_inv.dot(v - y)
 
         # Return
         return x_tilde, z_tilde
@@ -655,10 +578,10 @@ class OSQP(object):
         Update z variable in second ADMM step
         """
         alpha = self.work.settings.alpha
-        rho = self.work.settings.rho
+        rho_inv = self.work.settings.rho_inv
 
         # new z
-        z_new = alpha * z_tilde + (1. - alpha) * z + (1./rho) * y
+        z_new = alpha * z_tilde + (1. - alpha) * z + rho_inv.dot(y)
 
         return self.project(z_new)
 
@@ -670,7 +593,7 @@ class OSQP(object):
         alpha = self.work.settings.alpha
 
         # New y
-        return y + rho * (alpha * z_tilde + (1. - alpha) * z - z_new)
+        return y + rho.dot(alpha * z_tilde + (1. - alpha) * z - z_new)
 
     def compute_pri_res(self, polish, scaled_termination):
         """
@@ -1026,9 +949,9 @@ class OSQP(object):
         if self.work.settings.scaling:
             self.scale_data()
 
-        # Compute auto_rho in case
-        if self.work.settings.auto_rho:
-            self.compute_rho()
+        # Compute in case
+        # if self.work.settings.auto_rho:
+        self.compute_rho()
 
         # Factorize KKT
         self.work.linsys_solver = linsys_solver(self.work)
@@ -1057,7 +980,7 @@ class OSQP(object):
         """
         Obtain q from x, z, y vectors
         """
-        return np.append(x, z + (1./self.work.settings.rho) * y)
+        return np.append(x, z + self.work.settings.rho_inv.dot(y))
 
     def xzy_from_q(self, q):
         """
@@ -1069,7 +992,7 @@ class OSQP(object):
         x = q[:n]
         v = q[n:]
         z = self.project(v)
-        y = rho * (v - z)
+        y = rho.dot(v - z)
 
         # Return vectors
         return x, z, y
@@ -1301,14 +1224,33 @@ class OSQP(object):
             # Compute residuals ratio
             res_ratio = pri_res / dua_res
 
-            # Compute new rho
-            new_rho = self.work.settings.rho * np.sqrt(res_ratio)
+            # Get current mid_rho value
+            ineq_idx = self.work.ineq_idx
+            m = self.work.data.m
+            rho_diag = self.work.settings.rho.diagonal()
+            if any(ineq_idx):
+                cur_mid_rho = rho_diag[np.nonzero(ineq_idx)[0][0]]
 
-            # Print
-            print("New rho = %.2e" % new_rho)
+                # Compute new rho
+                new_rho_mid = cur_mid_rho * np.sqrt(res_ratio)
 
-            # Update rho
-            self.update_rho(new_rho)
+                # # Print
+                print("New rho_mid = %.2e" % new_rho_mid)
+                # print("Updated rho!")
+
+                # Construct new rho_vec
+                new_rho_vec = np.zeros(m)
+                for i in range(m):
+                    if ineq_idx[i]:
+                        new_rho_vec[i] = new_rho_mid
+                    else:
+                        new_rho_vec[i] = rho_diag[i]
+
+                # Construct new rho matrix
+                new_rho = spspa.diags(new_rho_vec)
+
+                # Update rho
+                self.update_rho(new_rho)
 
     def solve(self):
         """
@@ -1342,7 +1284,7 @@ class OSQP(object):
             self.store_plotting_vars()
 
             # Update rho?
-            # self.change_rho()
+            self.change_rho()
 
             # Check algorithm termination
             if self.work.settings.early_terminate:
@@ -1606,11 +1548,13 @@ class OSQP(object):
         """
         Update set-size parameter rho
         """
-        if rho_new <= 0:
+        if any(rho_new.diagonal() <= 0):
             raise ValueError("rho must be positive")
 
         # Update rho
         self.work.settings.rho = rho_new
+        self.work.settings.rho_inv = spspa.diags(
+            np.reciprocal(rho_new.diagonal()))
 
         # Factorize KKT
         self.work.linsys_solver = linsys_solver(self.work)

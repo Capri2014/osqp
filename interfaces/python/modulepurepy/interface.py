@@ -180,7 +180,7 @@ class OSQP(object):
         max_iter = kwargs.pop('max_iter', None)
         eps_abs = kwargs.pop('eps_abs', None)
         eps_rel = kwargs.pop('eps_rel', None)
-        rho = kwargs.pop('rho', None)
+        # rho = kwargs.pop('rho', None)
         alpha = kwargs.pop('alpha', None)
         delta = kwargs.pop('delta', None)
         polish = kwargs.pop('polish', None)
@@ -201,8 +201,8 @@ class OSQP(object):
         if eps_rel is not None:
             self._model.update_eps_rel(eps_rel)
 
-        if rho is not None:
-            self._model.update_rho(rho)
+        # if rho is not None:
+            # self._model.update_rho(rho)
 
         if alpha is not None:
             self._model.update_alpha(alpha)
@@ -231,19 +231,19 @@ class OSQP(object):
         if warm_start is not None:
             self._model.update_warm_start(warm_start)
 
+        #    rho is None and \
         if max_iter is None and \
-           eps_abs is None and \
-           eps_rel is None and \
-           rho is None and \
-           alpha is None and \
-           delta is None and \
-           polish is None and \
-           pol_refine_iter is None and \
-           verbose is None and \
-           scaled_termination is None and \
-           early_terminate is None and \
-           early_terminate_interval is None and \
-           warm_start is None:
+                eps_abs is None and \
+                eps_rel is None and \
+                alpha is None and \
+                delta is None and \
+                polish is None and \
+                pol_refine_iter is None and \
+                verbose is None and \
+                scaled_termination is None and \
+                early_terminate is None and \
+                early_terminate_interval is None and \
+                warm_start is None:
             ValueError("No updatable settings has been specified!")
 
     def solve(self):
