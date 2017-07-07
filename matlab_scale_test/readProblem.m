@@ -15,6 +15,7 @@ addParameter(p,'manualScaling',             false);
 addParameter(p,'primalPreScalingNorm',          2);
 addParameter(p,'dualPreScalingNorm',            2);
 addParameter(p,'ruizNorm',                      2);
+addParameter(p,'equalityRescaling',             1);
 
 %update from external options
 parse(p,readOptions);
@@ -59,6 +60,25 @@ end
 if(readOptions.manualScaling)
     problem = doManualScaling(problem,readOptions.ruizNorm);
 end
+
+if(readOptions.equalityRescaling ~= 1)
+    problem = doEqualityRescaling(problem,readOptions.equalityRescaling);
+end
+
+
+function problem = doEqualityRescaling(problem,scaleValue)
+
+%find all of the equality constraints
+eqidx = problem.l == problem.u;
+
+%make a scaling for the equalities
+d = ones(length(problem.l),1);
+d(eqidx) = scaleValue;
+D = sparse(diag(d));
+
+problem.A = D*problem.A;
+problem.l = D*problem.l;
+problem.u = D*problem.u;
 
 
 

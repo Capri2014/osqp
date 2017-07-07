@@ -1,6 +1,8 @@
 function makeFittingPlots(targetDir)
 
 [stats,optStats,optStatsUnFlat] = loadPlottingData(targetDir);
+optStats
+
 
 %% 
 l = [1e-5,1e4];
@@ -12,10 +14,8 @@ ylim(l)
 
 yyaxis 'right'; hold on  
 val1 = 1./((optStats.froA_s) ./ optStats.n);
-val2 = 2*(optStats.duaNorm_s2)./sqrt(optStats.priNorm_s2);
-val3 = (optStats.duaNorm_s2);
-optStats
-
+val2 = 2*(optStats.yNorm_s2)./sqrt(optStats.xNorm_s2);
+val3 = (optStats.yNorm_s2);
 
 semilogy(val1,'b-.');
 semilogy(val2,'r-.');
@@ -28,8 +28,8 @@ title('Optimal \rho (blue) and primal/dual solution ratios (red)');
 %%
 
 figure(2); clf
-semilogy(optStats.duaNorm_sinf,'r-.'); hold on
-semilogy(optStats.priNorm_sinf,'b-.'); hold on
+semilogy(optStats.yNorm_sinf,'r-.'); hold on
+semilogy(optStats.xNorm_sinf,'b-.'); hold on
 grid on
 title('Primal (blue) and dual (red) scaled solution norms');
 
@@ -53,30 +53,35 @@ idxs = f.status == 1;
 idxu = f.status == 0;
 
 x = f.rho./f.rhoOpt;
-ys = (f.resPri_s./f.resPriMax_s)./(f.resDua_s./f.resDuaMax_s);
-yu = (f.resPri_u./f.resPriMax_u)./(f.resDua_u./f.resDuaMax_u);
-y = yu;
+ys = (f.resPri_s2./f.resPriMax_s2)./(f.resDua_s2./f.resDuaMax_s2);
+%yu = (f.resPri_u1./f.resPriMax_u1)./(f.resDua_u1./f.resDuaMax_u1);
+y = ys;
 loglog(x(idx & idxs),1./y(idx & idxs),'b.'), hold on
 loglog(x(idx & idxu),1./y(idx & idxu),'r.')
 loglog(x(idx & idxu),1./y(idx & idxu),'r.')
 grid on
 l = [1e-8,1e8];
 xlim(l); ylim(l);
-title('Residual ratios vs \rho miscalibration');
+title('Residual ratios vs \rho miscalibration (2 norm)');
 
 
 %%
 figure(4); clf
 tags = {%'normD_1',...
         %'normD_inf',...%'normE_1',...%'normE_inf',...%'normDinv_1',...
-        'normq_s1',... %'normq_sinf',...%'normq_u1',...%'normA2_s',...'froA_s',...
-        'condA_s',... %'condNumberKKT_s'...%'infNormCond_s'
-        'normA2_s',...
-        'froA_s',
+        %'normq_s1',... %'normq_sinf',...%'normq_u1',...%'normA2_s',...'froA_s',...%'infNormCond_s'%'normA2_s',...%'froA_s',...
+        %'diffBndInvNorm_s2',...
+        %'diffBndInvRule',...
+        %'diffBndRule',...
+        'normq_s1',...
+        'dualNormMagEst_0',...
+        'normAq_1',...
+        'normApinvq_1',...
+        %'normAq_inf'
         };
     
 for i = 1:(length(tags))
-    h(i) = semilogy(getfield(optStats,tags{i})); hold on
+    h(i) = semilogy(getfield(optStats,tags{i})./optStats.normq_s1); hold on
 end
 legend(tags{:});
 %semilogy(optStats.condA_s,'k*'); hold on
@@ -125,8 +130,13 @@ targetDir = fullfile('solutions',targetDir);
 plotDataFile = fullfile(targetDir,'plottingData.mat');
 
 if(exist(plotDataFile,'file'))
-    fprintf('Loading pre-processed plotting file %s\n',plotDataFile);
-    load(plotDataFile); return;
+    %make sure it is up to date
+    d = dir(fullfile(targetDir,'*.mat'))
+    idx = find(strcmp({d.name},'plottingData.mat'));
+    if(all( [d.datenum] <= d(idx).datenum) )
+        fprintf('Loading pre-processed plotting file %s\n',plotDataFile);
+        load(plotDataFile); return;
+    end
 end
 
 %if it didn't exist, make it before returning

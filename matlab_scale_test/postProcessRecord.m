@@ -1,13 +1,6 @@
 function [stats,optStats] = postProcessRecord(stats)
 
 
-%eliminate all problems with sigma other than the minimal value
-sigMin = min([stats.sigma]);
-stats([stats.sigma] > sigMin) = [];
-
-%flatten the remaining problems
-stats = flattenStructArray(stats);
-
 %find the optimal rho for the problem
 [minIter,optIdx] = min([stats.iter]);
 rhoOpt = stats.rho(optIdx);
@@ -43,11 +36,6 @@ stats.rhoGoodUpper = repmat(rhoGoodUpper,[1 length(stats.iter)]);
 %make a structure with the optimal rho only
 foo = @(M)M(optIdx);
 optStats = structfun(foo,stats,'Uniform',0);
-
-%for this optimal rho structure, resolve the problem and try
-%to identify the active set
-
-%TBD
 
 
 

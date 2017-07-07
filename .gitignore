@@ -5,6 +5,7 @@ out/
 
 #solution files from matlab testing
 matlab_scale_test/solutions/
+matlab_scale_test/problems/random
 
 # Prerequisites
 *.d

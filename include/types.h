@@ -143,7 +143,7 @@ typedef struct {
          * @name These these can change for multiple runs with the same call to osqp_setup
          * @{
          */
-        c_int max_iter; ///< maximum iterations to tak
+        c_int max_iter; ///< maximum iterations to take
         c_float eps_abs;  ///< absolute convergence tolerance
         c_float eps_rel;  ///< relative convergence tolerance
         c_float eps_prim_inf;  ///< primal infeasibility tolerance
@@ -159,7 +159,7 @@ typedef struct {
         c_int auto_rho; ///< boolean, true if rho is chosen automatically
         #endif
 
-        c_int scaled_termination;  ///< boolean, use scaled termination criteria 
+        c_int scaled_termination;  ///< boolean, use scaled termination criteria
         c_int early_terminate;  ///< boolean, terminate if stopping criteria is met
         c_int early_terminate_interval; ///< boolean, interval for checking termination, if early_terminate == 1
         c_int warm_start; ///< boolean, warm start
@@ -224,7 +224,7 @@ typedef struct {
 
         c_float *D_temp;            ///< temporary primal variable scaling vectors
         c_float *D_temp_A;            ///< temporary primal variable scaling vectors storing norms of A columns
-        c_float *E_temp;            ///< temporary constraints scaling vectors storing norms of A' columns 
+        c_float *E_temp;            ///< temporary constraints scaling vectors storing norms of A' columns
 
         /** @} */
 

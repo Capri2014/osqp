@@ -60,5 +60,7 @@ test30:  same as test27, but without onesided problem conversion
 
 test31:  same as test26.  Check nonconvex scaling reimplementation validity (OK)
 
+test32:  same as test21, but scaling up the equalities
+
 SO FAR, 4, 18, 21, 22 are best.  22 is not much different from 21?
  
