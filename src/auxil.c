@@ -8,17 +8,13 @@
 
  void compute_rho(OSQPWorkspace * work){
 
-   printf("DEBUG: starting compute_rho\n");
-
     work->settings->rho_eq = c_min(c_max(work->settings->rho_eq, AUTO_RHO_MIN), AUTO_RHO_MAX);
     work->settings->rho_ineq = c_min(c_max(work->settings->rho_ineq, AUTO_RHO_MIN), AUTO_RHO_MAX);
 
     for(int i= 0; i < work->data->m; i++){
         work->rho_vec[i] = (work->data->l[i] == work->data->u[i]) ? work->settings->rho_eq : work->settings->rho_ineq;
         work->rho_vec_inv[i] = 1./work->rho_vec[i];
-        printf("DEBUG: Setting rho[%i] to %.2e, inv = %.2e \n",i,work->rho_vec[i],work->rho_vec_inv[i]);
     }
-    printf("DEBUG: compute_rho exit\n");
 }
  #endif // ifndef EMBEDDED
 

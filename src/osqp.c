@@ -12,8 +12,6 @@ OSQPWorkspace * osqp_setup(const OSQPData * data, OSQPSettings *settings){
     OSQPWorkspace * work; // Workspace
 
 
-    printf("DEBUG: osqp_setup\n");
-
     // Validate data
     if (validate_data(data)){
         #ifdef PRINTING
@@ -30,7 +28,6 @@ OSQPWorkspace * osqp_setup(const OSQPData * data, OSQPSettings *settings){
         return OSQP_NULL;
     }
 
-    printf("DEBUG: osqp_setup : settings = %p\n",(void*)settings);
     // Allocate empty workspace
     work = c_calloc(1, sizeof(OSQPWorkspace));
     if (!work){
@@ -83,7 +80,6 @@ OSQPWorkspace * osqp_setup(const OSQPData * data, OSQPSettings *settings){
 
     // Copy settings
     work->settings = copy_settings(settings);
-    printf("DEBUG: osqp_setup : work->settings = %p\n",(void*)work->settings);
 
     // Perform scaling
     if (settings->scaling) {
@@ -109,16 +105,11 @@ OSQPWorkspace * osqp_setup(const OSQPData * data, OSQPSettings *settings){
 
     // Compute rho automatically if specified
     //if (work->settings->auto_rho){
-    printf("DEBUG: Calling compute rho\n");
-
     compute_rho(work);
     //}
 
     // Initialize linear system solver private structure
     // Initialize private structure
-    printf("DEBUG: Calling init_priv\n");
-    printf("DEBUG: osqp_setup : work->settings = %p\n",(void*)work->settings);
-    printf("DEBUG: osqp_setup : work->rho_vec_inv = %p\n",(void*)work->rho_vec_inv);
     work->priv = init_priv(work->data->P, work->data->A, work->rho_vec_inv, work->settings, 0);
     if (!work->priv){
         #ifdef PRINTING

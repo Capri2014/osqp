@@ -11,12 +11,8 @@ csc * form_KKT(const csc * P, const  csc * A, c_float sigma, c_float * rho_vec_i
     c_int zKKT = 0;       // Counter for total number of elements in P and in KKT
     c_int * KKT_TtoC;  // Pointer to vector mapping from KKT in triplet form to CSC
 
-    printf("DEBUG: Calling form_KKT, m value == %i\n", P->m);
-
     // Get matrix dimensions
     nKKT = P->m + A->m;
-
-    c_print("DEBUG: inside form_KKT\n");
 
     // Get maximum number of nonzero elements (only upper triangular part)
     nnzKKTmax = P->p[P->n] +         // Number of elements in P
@@ -37,7 +33,6 @@ csc * form_KKT(const csc * P, const  csc * A, c_float sigma, c_float * rho_vec_i
 
     // Allocate Triplet matrices
     // P + sigma I
-    c_print("DEBUG: Calling init_priv : chk1\n");
     for (j = 0; j < P->n; j++){ // cycle over columns
         // No elements in column j => add diagonal element sigma
         if (P->p[j] == P->p[j+1]){
@@ -79,7 +74,6 @@ csc * form_KKT(const csc * P, const  csc * A, c_float sigma, c_float * rho_vec_i
         }
     }
 
-c_print("DEBUG: Calling init_priv : chk2\n");
     if (Pdiag_idx != OSQP_NULL){
         // Realloc Pdiag_idx so that it contains exactly *Pdiag_n diagonal elements
         (*Pdiag_idx) = c_realloc((*Pdiag_idx), (*Pdiag_n) * sizeof(c_int));
@@ -97,17 +91,12 @@ c_print("DEBUG: Calling init_priv : chk2\n");
         }
     }
 
-    c_print("DEBUG: Calling init_priv : chk3\n");
-
     // - diag(rho_vec_inv) at bottom right
     //  if this vector is NULL, using sigma instead
-    c_print("DEBUG: Populating KKT \n");
     for (j = 0; j < A->m; j++) {
         KKT_trip->i[zKKT] = j + P->n;
         KKT_trip->p[zKKT] = j + P->n;
-        printf("DEBUG: Calling init_priv : assigning\n");
         KKT_trip->x[zKKT] = rho_vec_inv == OSQP_NULL ? sigma : -rho_vec_inv[j];
-        c_print("DEBUG: Writing diagonal KKT values: [j] = %f\n",KKT_trip->x[zKKT]);
         zKKT++;
     }
 
@@ -148,6 +137,7 @@ c_print("DEBUG: Calling init_priv : chk2\n");
 
 }
 #endif
+
 
 
 
