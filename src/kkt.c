@@ -3,7 +3,7 @@
 #ifndef EMBEDDED
 
 
-csc * form_KKT(const csc * P, const  csc * A, c_float scalar1, c_float scalar2,
+csc * form_KKT(const csc * P, const  csc * A, c_float sigma, c_float * rho_vec_inv,
                c_int * PtoKKT, c_int * AtoKKT, c_int **Pdiag_idx, c_int *Pdiag_n){
     c_int nKKT, nnzKKTmax; // Size, number of nonzeros and max number of nonzeros in KKT matrix
     csc * KKT_trip, * KKT;   // KKT matrix in triplet format and CSC format
@@ -11,14 +11,18 @@ csc * form_KKT(const csc * P, const  csc * A, c_float scalar1, c_float scalar2,
     c_int zKKT = 0;       // Counter for total number of elements in P and in KKT
     c_int * KKT_TtoC;  // Pointer to vector mapping from KKT in triplet form to CSC
 
+    printf("DEBUG: Calling form_KKT, m value == %i\n", P->m);
+
     // Get matrix dimensions
     nKKT = P->m + A->m;
 
+    c_print("DEBUG: inside form_KKT\n");
+
     // Get maximum number of nonzero elements (only upper triangular part)
     nnzKKTmax = P->p[P->n] +         // Number of elements in P
-                P->m +               // Number of elements in scalar1 * I
+                P->m +               // Number of elements in sigma * I
                 A->p[A->n] +         // Number of nonzeros in A
-                A->m;                // Number of elements in - scalar2 * I
+                A->m;                // Number of elements in - rho_vec_inv
 
     // Preallocate KKT matrix in triplet format
     KKT_trip = csc_spalloc(nKKT, nKKT, nnzKKTmax, 1, 1);
@@ -32,13 +36,14 @@ csc * form_KKT(const csc * P, const  csc * A, c_float scalar1, c_float scalar2,
     }
 
     // Allocate Triplet matrices
-    // P + scalar1 I
+    // P + sigma I
+    c_print("DEBUG: Calling init_priv : chk1\n");
     for (j = 0; j < P->n; j++){ // cycle over columns
-        // No elements in column j => add diagonal element scalar1
+        // No elements in column j => add diagonal element sigma
         if (P->p[j] == P->p[j+1]){
             KKT_trip->i[zKKT] = j;
             KKT_trip->p[zKKT] = j;
-            KKT_trip->x[zKKT] = scalar1;
+            KKT_trip->x[zKKT] = sigma;
             zKKT++;
         }
         for (ptr = P->p[j]; ptr < P->p[j + 1]; ptr++) { // cycle over rows
@@ -50,8 +55,8 @@ csc * form_KKT(const csc * P, const  csc * A, c_float scalar1, c_float scalar2,
             KKT_trip->p[zKKT] = j;
             KKT_trip->x[zKKT] = P->x[ptr];
             if (PtoKKT != OSQP_NULL) PtoKKT[ptr] = zKKT;  // Update index from P to KKTtrip
-            if (i == j){ // P has a diagonal element, add scalar1
-                KKT_trip->x[zKKT] += scalar1;
+            if (i == j){ // P has a diagonal element, add sigma
+                KKT_trip->x[zKKT] += sigma;
 
                 // If index vector pointer supplied -> Store the index
                 if (Pdiag_idx != OSQP_NULL) {
@@ -61,19 +66,20 @@ csc * form_KKT(const csc * P, const  csc * A, c_float scalar1, c_float scalar2,
             }
             zKKT++;
 
-            // Add diagonal scalar1 in case
+            // Add diagonal sigma in case
             if ((i < j) && // Diagonal element not reached
                 (ptr + 1 == P->p[j+1])){ // last element of column j
 
-                // Add diagonal element scalar1
+                // Add diagonal element sigma
                 KKT_trip->i[zKKT] = j;
                 KKT_trip->p[zKKT] = j;
-                KKT_trip->x[zKKT] = scalar1;
+                KKT_trip->x[zKKT] = sigma;
                 zKKT++;
             }
         }
     }
 
+c_print("DEBUG: Calling init_priv : chk2\n");
     if (Pdiag_idx != OSQP_NULL){
         // Realloc Pdiag_idx so that it contains exactly *Pdiag_n diagonal elements
         (*Pdiag_idx) = c_realloc((*Pdiag_idx), (*Pdiag_n) * sizeof(c_int));
@@ -91,11 +97,17 @@ csc * form_KKT(const csc * P, const  csc * A, c_float scalar1, c_float scalar2,
         }
     }
 
-    // - scalar2 * I at bottom right
+    c_print("DEBUG: Calling init_priv : chk3\n");
+
+    // - diag(rho_vec_inv) at bottom right
+    //  if this vector is NULL, using sigma instead
+    c_print("DEBUG: Populating KKT \n");
     for (j = 0; j < A->m; j++) {
         KKT_trip->i[zKKT] = j + P->n;
         KKT_trip->p[zKKT] = j + P->n;
-        KKT_trip->x[zKKT] = - scalar2;
+        printf("DEBUG: Calling init_priv : assigning\n");
+        KKT_trip->x[zKKT] = rho_vec_inv == OSQP_NULL ? sigma : -rho_vec_inv[j];
+        c_print("DEBUG: Writing diagonal KKT values: [j] = %f\n",KKT_trip->x[zKKT]);
         zKKT++;
     }
 
@@ -149,7 +161,7 @@ void update_KKT_P(csc * KKT, const csc * P, const c_int * PtoKKT, const c_float 
         KKT->x[PtoKKT[i]] = P->x[i];
     }
 
-    // Update diagonal elements of KKT by adding sigma
+    // Update diagonal elements of KKT by adding scalar1
     for (i = 0; i < Pdiag_n; i++){
         j = Pdiag_idx[i];  // Extract ondex of the element on the diagonal
         KKT->x[PtoKKT[j]] += scalar1;

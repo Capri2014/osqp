@@ -15,6 +15,7 @@ extern "C" {
 // Initialize private variable for solver
 // NB: Only the upper triangular part of P is stuffed!
 Priv *init_priv(const csc * P, const csc * A,
+                c_float * rho_vec_inv,
                 const OSQPSettings *settings, c_int polish);
 
 // Free LDL Factorization structure

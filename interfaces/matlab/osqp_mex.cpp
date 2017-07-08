@@ -32,7 +32,8 @@ const char* OSQP_INFO_FIELDS[] = {"iter",         //c_int
 
 const char* OSQP_SETTINGS_FIELDS[] =
                                 //the following subset can't be changed after initilization
-                               {"rho",            //c_float
+                               {"rho_eq",            //c_float
+                                "rho_ineq",            //c_float
                                 "sigma",            //c_float
                                 "scaling",        //c_int
                                 "scaling_iter",   //c_int
@@ -701,7 +702,8 @@ mxArray* copySettingsToMxStruct(OSQPSettings* settings){
 
   //map the OSQP_SETTINGS fields one at a time into mxArrays
   //matlab handles everything as a double
-  mxSetField(mxPtr, 0, "rho",             mxCreateDoubleScalar(settings->rho));
+  mxSetField(mxPtr, 0, "rho_eq",          mxCreateDoubleScalar(settings->rho_eq));
+  mxSetField(mxPtr, 0, "rho_ineq",        mxCreateDoubleScalar(settings->rho_ineq));
   mxSetField(mxPtr, 0, "sigma",           mxCreateDoubleScalar(settings->sigma));
   mxSetField(mxPtr, 0, "scaling",         mxCreateDoubleScalar(settings->scaling));
   mxSetField(mxPtr, 0, "scaling_iter",    mxCreateDoubleScalar(settings->scaling_iter));
@@ -790,15 +792,15 @@ mxArray* copyPrivToMxStruct(OSQPWorkspace * work){
 
   int nfields;
   mxArray* mxPtr;
-  OSQPData * data; 
+  OSQPData * data;
   Priv * priv;
-  
+
   nfields = sizeof(PRIV_FIELDS) / sizeof(PRIV_FIELDS[0]);
   mxPtr = mxCreateStructMatrix(1,1,nfields,PRIV_FIELDS);
-  
+
   data = work->data;
   priv = work->priv;
-  
+
   // Dimensions
   int n = priv->L->n;
   int Pdiag_n = priv->Pdiag_n;
@@ -859,14 +861,14 @@ mxArray* copyScalingToMxStruct(OSQPWorkspace *work){
 
   int n, m, nfields;
   mxArray* mxPtr;
-  
-  
+
+
   if (work->settings->scaling){ // Scaling performed
       n = work->data->n;
       m = work->data->m;
 
       nfields = sizeof(OSQP_SCALING_FIELDS) / sizeof(OSQP_SCALING_FIELDS[0]);
-      mxPtr = mxCreateStructMatrix(1,1,nfields,OSQP_SCALING_FIELDS); 
+      mxPtr = mxCreateStructMatrix(1,1,nfields,OSQP_SCALING_FIELDS);
 
       // Create vectors
       mxArray* D    = mxCreateDoubleMatrix(n,1,mxREAL);
@@ -889,7 +891,7 @@ mxArray* copyScalingToMxStruct(OSQPWorkspace *work){
   } else {
     mxPtr = mxCreateDoubleMatrix(0, 0, mxREAL);
   }
-  
+
    return mxPtr;
 }
 
@@ -935,7 +937,8 @@ void copyMxStructToSettings(const mxArray* mxPtr, OSQPSettings* settings){
 
   //map the OSQP_SETTINGS fields one at a time into mxArrays
   //matlab handles everything as a double
-  settings->rho             = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "rho"));
+  settings->rho_eq          = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "rho_eq"));
+  settings->rho_ineq        = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "rho_ineq"));
   settings->sigma           = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "sigma"));
   settings->scaling         = (c_int)mxGetScalar(mxGetField(mxPtr, 0, "scaling"));
   settings->scaling_iter    = (c_int)mxGetScalar(mxGetField(mxPtr, 0, "scaling_iter"));

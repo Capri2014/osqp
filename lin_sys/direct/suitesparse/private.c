@@ -160,7 +160,10 @@ c_int permute_KKT(csc ** KKT, Priv * p, c_int Pnz, c_int Anz, c_int * PtoKKT, c_
  * @param  polish   Flag whether we are initializing for polish or not
  * @return          Initialized private structure
  */
-Priv *init_priv(const csc * P, const csc * A, const OSQPSettings *settings, c_int polish){
+Priv *init_priv(const csc * P, const csc * A, c_float * rho_vec_inv, const OSQPSettings *settings, c_int polish){
+
+  printf("DEBUG: Inside init_priv\n");
+  printf("DEBUG: init_priv : settings = %p\n",(void*)settings);
     // Define Variables
     Priv * p;                    // KKT factorization structure
     c_int n_plus_m;              // Define n_plus_m dimension
@@ -193,18 +196,24 @@ Priv *init_priv(const csc * P, const csc * A, const OSQPSettings *settings, c_in
 
     // Form and permute KKT matrix
     if (polish){ // Called from polish()
-        KKT_temp = form_KKT(P, A, settings->delta, settings->delta, OSQP_NULL, OSQP_NULL, OSQP_NULL, OSQP_NULL);
+      printf("DEBUG: Calling polish\n");
+      printf("DEBUG: Settings pointer, %p\n", (void*)settings);
+      printf("DEBUG: Calling polish, delta = %f\n", settings->delta);
+      printf("DEBUG: Calling polish\n");
+        KKT_temp = form_KKT(P, A, settings->delta, OSQP_NULL, OSQP_NULL, OSQP_NULL, OSQP_NULL, OSQP_NULL);
+        printf("DEBUG: polish, done KKT\n");
 
         // Permute matrix
         permute_KKT(&KKT_temp, p, OSQP_NULL, OSQP_NULL, OSQP_NULL, OSQP_NULL);
     }
     else { // Called from ADMM algorithm
 
-        // Allocate vectors of indeces
+        // Allocate vectors of indices
         p->PtoKKT = c_malloc((P->p[P->n]) * sizeof(c_int));
         p->AtoKKT = c_malloc((A->p[A->n]) * sizeof(c_int));
 
-        KKT_temp = form_KKT(P, A, settings->sigma, 1./settings->rho,
+        printf("DEBUG: Calling form_KKT\n");
+        KKT_temp = form_KKT(P, A, settings->sigma, rho_vec_inv,
                             p->PtoKKT, p->AtoKKT,
                             &(p->Pdiag_idx), &(p->Pdiag_n));
 

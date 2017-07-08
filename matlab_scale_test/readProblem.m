@@ -3,6 +3,10 @@ function problem = readProblem(filename, readOptions)
 % readProblem : read a QP source file and apply various reformulations
 % to it for testing purposes
 
+if(nargin < 2)
+    readOptions = struct;
+end
+
 %Configure the default settings
 p = inputParser;
 addParameter(p,'makeOneSided',              false);

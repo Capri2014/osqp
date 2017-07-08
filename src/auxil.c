@@ -7,37 +7,19 @@
 
 
  void compute_rho(OSQPWorkspace * work){
-    c_float trP, trAtA, ratio;
-    c_int n, m;
 
-    if (work->data->m == 0){ // No consraints. Use max rho
-        work->settings->rho = AUTO_RHO_MAX;
-        return;
+   printf("DEBUG: starting compute_rho\n");
+
+    work->settings->rho_eq = c_min(c_max(work->settings->rho_eq, AUTO_RHO_MIN), AUTO_RHO_MAX);
+    work->settings->rho_ineq = c_min(c_max(work->settings->rho_ineq, AUTO_RHO_MIN), AUTO_RHO_MAX);
+
+    for(int i= 0; i < work->data->m; i++){
+        work->rho_vec[i] = (work->data->l[i] == work->data->u[i]) ? work->settings->rho_eq : work->settings->rho_ineq;
+        work->rho_vec_inv[i] = 1./work->rho_vec[i];
+        printf("DEBUG: Setting rho[%i] to %.2e, inv = %.2e \n",i,work->rho_vec[i],work->rho_vec_inv[i]);
     }
-
-    n = work->data->n;
-    m = work->data->m;
-
-    // Depends only on n and m
-    /* work->settings->rho = AUTO_RHO_BETA0 * */
-    /*                       pow(work->data->n, AUTO_RHO_BETA1) * */
-    /*                       pow(work->data->m, AUTO_RHO_BETA2); */
-
-    // Old stuff with traces
-    // Compute tr(P)
-    trP = mat_trace(work->data->P);
-
-    // Compute tr(AtA) = fro(A) ^ 2
-    trAtA = mat_fro_sq(work->data->A);
-
-    // Compute rho = beta0 * (trP + sigma * n)^(beta1) * (trAtA)^(beta2)
-    work->settings->rho = AUTO_RHO_BETA0 *
-                          pow((trP + work->settings->sigma * n)/n , AUTO_RHO_BETA1) *
-                          pow((trAtA) / m, AUTO_RHO_BETA2);
-
-
-    work->settings->rho = c_min(c_max(work->settings->rho, AUTO_RHO_MIN), AUTO_RHO_MAX);
- }
+    printf("DEBUG: compute_rho exit\n");
+}
  #endif // ifndef EMBEDDED
 
 
@@ -67,7 +49,8 @@ static void compute_rhs(OSQPWorkspace *work){
     }
     for (i = 0; i < work->data->m; i++){
         // Cycle over dual variable in the first step (nu)
-        work->xz_tilde[i + work->data->n] = work->z_prev[i] - (c_float) 1./work->settings->rho * work->y[i];
+        work->xz_tilde[i + work->data->n] = work->z_prev[i] - (c_float)
+        work->rho_vec_inv[i] * work->y[i];
     }
 
 }
@@ -76,7 +59,7 @@ static void compute_rhs(OSQPWorkspace *work){
 static void update_z_tilde(OSQPWorkspace *work){
     c_int i; // Index
     for (i = 0; i < work->data->m; i++){
-        work->xz_tilde[i + work->data->n] = work->z_prev[i] + (c_float) 1./work->settings->rho * (work->xz_tilde[i + work->data->n] - work->y[i]);
+        work->xz_tilde[i + work->data->n] = work->z_prev[i] + (c_float) work->rho_vec_inv[i] * (work->xz_tilde[i + work->data->n] - work->y[i]);
     }
 }
 
@@ -116,7 +99,7 @@ void update_z(OSQPWorkspace *work){
     for (i = 0; i < work->data->m; i++){
         work->z[i] = work->settings->alpha * work->xz_tilde[i + work->data->n] +
                      ((c_float) 1.0 - work->settings->alpha) * work->z_prev[i] +
-                     (c_float) 1./work->settings->rho * work->y[i];
+                     (c_float) work->rho_vec_inv[i] * work->y[i];
     }
 
     // project z
@@ -130,7 +113,7 @@ void update_y(OSQPWorkspace *work){
     c_int i; // Index
     for (i = 0; i < work->data->m; i++){
 
-        work->delta_y[i] = work->settings->rho *
+        work->delta_y[i] = work->rho_vec[i] *
             (work->settings->alpha * work->xz_tilde[i + work->data->n] +
             ((c_float) 1.0 - work->settings->alpha) * work->z_prev[i] - work->z[i]);
         work->y[i] += work->delta_y[i];
@@ -660,7 +643,7 @@ c_int validate_settings(const OSQPSettings * settings){
         return 1;
     }
 
-    if (settings->rho <= 0) {
+    if (settings->rho_eq <= 0 || settings->rho_ineq <= 0 ) {
         #ifdef PRINTING
         c_print("rho must be positive\n");
         #endif

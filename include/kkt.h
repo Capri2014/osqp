@@ -27,15 +27,15 @@ extern "C" {
  *
  * @param  P          cost matrix (already just upper triangular part)
  * @param  A          linear constraint matrix
- * @param  scalar1    regularization parameter scalar1
- * @param  scalar2    regularization parameter scalar2
+ * @param  sigma       regularization parameter sigma
+ * @param  rho_vec_inv inverse of regularization parameter rho (vectorized)
  * @param  PtoKKT     (modified) index mapping from elements of P to KKT matrix
  * @param  AtoKKT     (modified) index mapping from elements of A to KKT matrix
  * @param  Pdiag_idx  (modified) Address of the index of diagonal elements in P
  * @param  Pdiag_n    (modified) Address to the number of diagonal elements in P
  * @return            return status flag
  */
-csc * form_KKT(const csc * P, const  csc * A, c_float scalar1, c_float scalar2,
+csc * form_KKT(const csc * P, const  csc * A, c_float sigma, c_float * rho_vec_inv,
                c_int * PtoKKT, c_int * AtoKKT, c_int **Pdiag_idx, c_int *Pdiag_n);
 #endif // ifndef EMBEDDED
 

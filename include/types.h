@@ -130,9 +130,10 @@ typedef struct {
          * @name These *cannot* change for multiple runs with the same call to osqp_setup
          * @{
          */
-        c_float rho;     ///< ADMM step rho
-        c_float sigma;   ///< ADMM step sigma
-        c_int scaling;   ///< boolean, heuristic data rescaling
+        c_float rho_eq;    ///< ADMM step rho (for equalities)
+        c_float rho_ineq;  ///< ADMM step rho (for equalities)
+        c_float sigma;     ///< ADMM step sigma
+        c_int scaling;     ///< boolean, heuristic data rescaling
 
         #if EMBEDDED != 1
         c_int scaling_iter; ///< scaling iteration
@@ -226,7 +227,14 @@ typedef struct {
         c_float *D_temp_A;            ///< temporary primal variable scaling vectors storing norms of A columns
         c_float *E_temp;            ///< temporary constraints scaling vectors storing norms of A' columns
 
-        /** @} */
+        /**
+         * @name Temporary vector used to store a vectorized rho parameter
+         * @{
+         */
+
+        c_float *rho_vec;                ///< vector of rho values
+        c_float *rho_vec_inv;            ///< vector of inv rho values
+
 
 
         /** @} */

@@ -201,7 +201,9 @@ c_int polish(OSQPWorkspace *work) {
     mred = form_Ared(work);
 
     // Form and factorize reduced KKT
-    plsh = init_priv(work->data->P, work->pol->Ared, work->settings, 1);
+    printf("DEBUG: polish : work->settings = %p\n",(void*)work->settings);
+    printf("DEBUG: polish : work->settings = %p\n",(void*)work->rho_vec_inv);
+    plsh = init_priv(work->data->P, work->pol->Ared, work->rho_vec_inv,work->settings, 1);
     if (!plsh){
         // Polishing failed
         work->info->status_polish = -1;

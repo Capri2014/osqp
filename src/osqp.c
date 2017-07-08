@@ -11,6 +11,9 @@
 OSQPWorkspace * osqp_setup(const OSQPData * data, OSQPSettings *settings){
     OSQPWorkspace * work; // Workspace
 
+
+    printf("DEBUG: osqp_setup\n");
+
     // Validate data
     if (validate_data(data)){
         #ifdef PRINTING
@@ -27,6 +30,7 @@ OSQPWorkspace * osqp_setup(const OSQPData * data, OSQPSettings *settings){
         return OSQP_NULL;
     }
 
+    printf("DEBUG: osqp_setup : settings = %p\n",(void*)settings);
     // Allocate empty workspace
     work = c_calloc(1, sizeof(OSQPWorkspace));
     if (!work){
@@ -73,9 +77,13 @@ OSQPWorkspace * osqp_setup(const OSQPData * data, OSQPSettings *settings){
     work->Pdelta_x = c_calloc(work->data->n, sizeof(c_float));
     work->Adelta_x = c_calloc(work->data->m, sizeof(c_float));
 
+    //rho scaling vectors
+    work->rho_vec     = c_calloc(work->data->m, sizeof(c_float));
+    work->rho_vec_inv = c_calloc(work->data->m, sizeof(c_float));
 
     // Copy settings
     work->settings = copy_settings(settings);
+    printf("DEBUG: osqp_setup : work->settings = %p\n",(void*)work->settings);
 
     // Perform scaling
     if (settings->scaling) {
@@ -100,13 +108,18 @@ OSQPWorkspace * osqp_setup(const OSQPData * data, OSQPSettings *settings){
 
 
     // Compute rho automatically if specified
-    if (work->settings->auto_rho){
-        compute_rho(work);
-    }
+    //if (work->settings->auto_rho){
+    printf("DEBUG: Calling compute rho\n");
+
+    compute_rho(work);
+    //}
 
     // Initialize linear system solver private structure
     // Initialize private structure
-    work->priv = init_priv(work->data->P, work->data->A, work->settings, 0);
+    printf("DEBUG: Calling init_priv\n");
+    printf("DEBUG: osqp_setup : work->settings = %p\n",(void*)work->settings);
+    printf("DEBUG: osqp_setup : work->rho_vec_inv = %p\n",(void*)work->rho_vec_inv);
+    work->priv = init_priv(work->data->P, work->data->A, work->rho_vec_inv, work->settings, 0);
     if (!work->priv){
         #ifdef PRINTING
         c_print("ERROR: Linear systems solver initialization failure!\n");
