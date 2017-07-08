@@ -1235,7 +1235,8 @@ class OSQP(object):
                 new_rho_mid = cur_mid_rho * np.sqrt(res_ratio)
 
                 # # Print
-                print("New rho_mid = %.2e" % new_rho_mid)
+                if self.work.settings.verbose:
+                    print("New rho_mid = %.2e" % new_rho_mid)
                 # print("Updated rho!")
 
                 # Construct new rho_vec
@@ -1251,6 +1252,39 @@ class OSQP(object):
 
                 # Update rho
                 self.update_rho(new_rho)
+
+    def generate_plots(self):
+        import matplotlib.pylab as plt
+
+        # Plot norm of q
+        fig = plt.figure(1)
+        ax = fig.add_subplot(311)
+        ax.set_ylabel(r'$\|q_{k+1} - q_{k}\|$')
+        plt.semilogy(self.work.norm_delta_q)
+        # ax.set_xlim([0, self.work.settings.max_iter])
+        plt.grid()
+        plt.tight_layout()
+        plt.show(block=False)
+
+        # Plot cos_angle_delta_q
+        # fig = plt.figure(2)
+        ax = fig.add_subplot(312)
+        ax.set_ylabel(r'$\|\cos(\delta_{q_{k+1}}, \delta_{q_{k}})\|$')
+        plt.plot(self.work.cos_angle_delta_q)
+        # ax.set_xlim([0, self.work.settings.max_iter])
+        plt.grid()
+        plt.tight_layout()
+        plt.show(block=False)
+
+        # Plot residual ratio
+        # fig = plt.figure(3)
+        ax = fig.add_subplot(313)
+        ax.set_ylabel(r'$\|r_{pri} / r_{dua}\|$')
+        plt.semilogy(self.work.residuals_ratio)
+        # ax.set_xlim([0, self.work.settings.max_iter])
+        plt.grid()
+        plt.tight_layout()
+        plt.show(block=False)
 
     def solve(self):
         """
@@ -1353,39 +1387,8 @@ class OSQP(object):
         '''
         Plotting
         '''
-        import matplotlib.pylab as plt
-
-        # Plot norm of q
-        fig = plt.figure(1)
-        ax = fig.add_subplot(311)
-        ax.set_ylabel(r'$\|q_{k+1} - q_{k}\|$')
-        plt.semilogy(self.work.norm_delta_q)
-        # ax.set_xlim([0, self.work.settings.max_iter])
-        plt.grid()
-        plt.tight_layout()
-        plt.show(block=False)
-
-        # Plot cos_angle_delta_q
-        # fig = plt.figure(2)
-        ax = fig.add_subplot(312)
-        ax.set_ylabel(r'$\|\cos(\delta_{q_{k+1}}, \delta_{q_{k}})\|$')
-        plt.plot(self.work.cos_angle_delta_q)
-        # ax.set_xlim([0, self.work.settings.max_iter])
-        plt.grid()
-        plt.tight_layout()
-        plt.show(block=False)
-
-        # Plot residual ratio
-        # fig = plt.figure(3)
-        ax = fig.add_subplot(313)
-        ax.set_ylabel(r'$\|r_{pri} / r_{dua}\|$')
-        plt.semilogy(self.work.residuals_ratio)
-        # ax.set_xlim([0, self.work.settings.max_iter])
-        plt.grid()
-        plt.tight_layout()
-        plt.show(block=False)
-
-
+        if self.work.settings.verbose:
+            self.generate_plots()
 
         # Store results structure
         return results(self.work.solution, self.work.info)
