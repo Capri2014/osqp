@@ -421,8 +421,8 @@ class OSQP(object):
         RHO_MIN = 1e-06
         RHO_MAX = 1e06
         RHO_TOL = 1e-08
-        RHO_MID = 0.1
-
+        RHO_MID = 0.2
+        SAME_RHO = False
         m = self.work.data.m
         rho_vec = np.zeros(m)
 
@@ -433,25 +433,29 @@ class OSQP(object):
         l = self.work.data.l
         u = self.work.data.u
 
-        for i in range(m):
-            if np.abs(l[i]) >= OSQP_INFTY*1e-06 and np.abs(u[i]) >= OSQP_INFTY*1e-06:
-                # Unconstrained
-                rho_vec[i] = RHO_MIN
-            elif np.abs(u[i] - l[i]) >= OSQP_INFTY * 1e-06:
-                # One sided constraint
-                rho_vec[i] = RHO_MID
-                ineq_idx[i] = True
-            elif np.abs(u[i] - l[i]) < 1e-08:
-                # Equality constraint
-                rho_vec[i] = RHO_MAX
-            else:
-                # Range constraint
-                # rho_vec[i] = 1000. / (u[i] - l[i])
-                rho_vec[i] = RHO_MID
-                ineq_idx[i] = True
+        if SAME_RHO:
+            rho_vec = RHO_MID * np.ones(m)
+            ineq_idx = np.ones(m, dtype=bool)
+        else:
+            for i in range(m):
+                if np.abs(l[i]) >= OSQP_INFTY*1e-06 and np.abs(u[i]) >= OSQP_INFTY*1e-06:
+                    # Unconstrained
+                    rho_vec[i] = RHO_MIN
+                elif np.abs(u[i] - l[i]) >= OSQP_INFTY * 1e-06:
+                    # One sided constraint
+                    rho_vec[i] = RHO_MID
+                    ineq_idx[i] = True
+                elif np.abs(u[i] - l[i]) < 1e-08:
+                    # Equality constraint
+                    rho_vec[i] = RHO_MAX
+                else:
+                    # Range constraint
+                    # rho_vec[i] = 1000. / (u[i] - l[i])
+                    rho_vec[i] = RHO_MID
+                    ineq_idx[i] = True
 
-            # Constrain between maximum and minimum
-            rho_vec[i] = np.maximum(np.minimum(rho_vec[i], RHO_MAX), RHO_MIN)
+                # Constrain between maximum and minimum
+                rho_vec[i] = np.maximum(np.minimum(rho_vec[i], RHO_MAX), RHO_MIN)
 
         self.work.settings.rho = spspa.diags(rho_vec)
         self.work.settings.rho_inv = spspa.diags(np.reciprocal(rho_vec))
@@ -1187,6 +1191,12 @@ class OSQP(object):
                 (la.norm(delta_q) * la.norm(delta_q_next))
         self.work.cos_angle_delta_q.append(cos_angle_delta_q)
 
+        # Store diff_delta_q
+        self.work.diff_delta_q.append(la.norm(delta_q_next) -
+                                      la.norm(delta_q))
+        self.work.ratio_delta_q.append(la.norm(delta_q_next) /
+                                       (la.norm(delta_q) + 1e-08))
+
         # Compute primal dual residual ratio
         pri_res = self.compute_pri_res(0, self.work.settings.scaled_termination)
         dua_res = self.compute_dua_res(0, self.work.settings.scaled_termination)
@@ -1197,7 +1207,7 @@ class OSQP(object):
         Check if rho has to be changed and in case change it
         """
 
-        CHANGE_RHO_TOL = 1e-05
+        CHANGE_RHO_TOL = 1e-03
 
         # Get variables q, q_prev, q_next
         q_prev = self.q_from_xzy(self.work.x_prev_prev,
@@ -1217,51 +1227,80 @@ class OSQP(object):
             cos_angle_delta_q = delta_q_next.dot(delta_q) / \
                 (la.norm(delta_q) * la.norm(delta_q_next))
 
-        if cos_angle_delta_q > 1 - CHANGE_RHO_TOL:
+        # print("norm diff delta = %.2e" % la.norm(la.norm(delta_q_next) - la.norm(delta_q)))
+        # if la.norm(la.norm(delta_q_next) - la.norm(delta_q)) < \
+        #         CHANGE_RHO_TOL:
+            # if cos_angle_delta_q > 1 - CHANGE_RHO_TOL:
+        if la.norm(la.norm(delta_q_next) /
+                   (la.norm(delta_q) + 1e-08) - 1) < CHANGE_RHO_TOL or \
+                cos_angle_delta_q > 1 - CHANGE_RHO_TOL:
             pri_res = self.compute_pri_res(0, True)  # Scaled residual
             dua_res = self.compute_dua_res(0, True)  # Scaled residual
 
             # Compute residuals ratio
             res_ratio = pri_res / dua_res
 
-            # Get current mid_rho value
-            ineq_idx = self.work.ineq_idx
-            m = self.work.data.m
-            rho_diag = self.work.settings.rho.diagonal()
-            if any(ineq_idx):
-                cur_mid_rho = rho_diag[np.nonzero(ineq_idx)[0][0]]
+            # Change rho only if the residual ratio is big enough
+            if res_ratio > 10:
+                # Get current mid_rho value
+                ineq_idx = self.work.ineq_idx
+                m = self.work.data.m
+                rho_diag = self.work.settings.rho.diagonal()
+                if any(ineq_idx):
+                    cur_mid_rho = rho_diag[np.nonzero(ineq_idx)[0][0]]
 
-                # Compute new rho
-                new_rho_mid = cur_mid_rho * np.sqrt(res_ratio)
+                    # Compute new rho
+                    new_rho_mid = cur_mid_rho * np.sqrt(res_ratio)
 
-                # # Print
-                if self.work.settings.verbose:
-                    print("New rho_mid = %.2e" % new_rho_mid)
-                # print("Updated rho!")
+                    # # Print
+                    if self.work.settings.verbose:
+                        print("New rho_mid = %.2e" % new_rho_mid)
+                    # print("Updated rho!")
 
-                # Construct new rho_vec
-                new_rho_vec = np.zeros(m)
-                for i in range(m):
-                    if ineq_idx[i]:
-                        new_rho_vec[i] = new_rho_mid
-                    else:
-                        new_rho_vec[i] = rho_diag[i]
+                    # Construct new rho_vec
+                    new_rho_vec = np.zeros(m)
+                    for i in range(m):
+                        if ineq_idx[i]:
+                            new_rho_vec[i] = new_rho_mid
+                        else:
+                            new_rho_vec[i] = rho_diag[i]
 
-                # Construct new rho matrix
-                new_rho = spspa.diags(new_rho_vec)
+                    # Construct new rho matrix
+                    new_rho = spspa.diags(new_rho_vec)
 
-                # Update rho
-                self.update_rho(new_rho)
+                    # Update rho
+                    self.update_rho(new_rho)
+                    # print("rho = ", end=''); print(new_rho_vec)
 
     def generate_plots(self):
         import matplotlib.pylab as plt
 
-        # Plot norm of q
+        # # Plot norm of q
+        # fig = plt.figure(1)
+        # ax = fig.add_subplot(311)
+        # ax.set_ylabel(r'$\|q_{k+1} - q_{k}\|$')
+        # plt.semilogy(self.work.norm_delta_q)
+        # # ax.set_xlim([0, self.work.settings.max_iter])
+        # plt.grid()
+        # plt.tight_layout()
+        # plt.show(block=False)
+
+        # # Plot diff delta_q delta_qprev
+        # fig = plt.figure(1)
+        # ax = fig.add_subplot(311)
+        # ax.set_ylabel(r'$\|\delta_{q_{k+1}}\| - \|\delta_{q_{k}})\|$')
+        # plt.plot(self.work.diff_delta_q)
+        # # ax.set_xlim([0, self.work.settings.max_iter])
+        # plt.grid()
+        # plt.tight_layout()
+        # plt.show(block=False)
+
+        # Plot ratio delta_q delta_qprev
         fig = plt.figure(1)
         ax = fig.add_subplot(311)
-        ax.set_ylabel(r'$\|q_{k+1} - q_{k}\|$')
-        plt.semilogy(self.work.norm_delta_q)
-        # ax.set_xlim([0, self.work.settings.max_iter])
+        ax.set_ylabel(r'$\|\delta_{q_{k+1}}\| / \|\delta_{q_{k}})\|$')
+        plt.plot(self.work.ratio_delta_q)
+        ax.set_ylim([0., 2.])
         plt.grid()
         plt.tight_layout()
         plt.show(block=False)
@@ -1275,6 +1314,7 @@ class OSQP(object):
         plt.grid()
         plt.tight_layout()
         plt.show(block=False)
+
 
         # Plot residual ratio
         # fig = plt.figure(3)
@@ -1301,9 +1341,11 @@ class OSQP(object):
         if not self.work.settings.warm_start:
             self.cold_start()
 
-        # PLOTTING:
+        # Plotting
         self.work.norm_delta_q = []
         self.work.cos_angle_delta_q = []
+        self.work.diff_delta_q = []
+        self.work.ratio_delta_q = []
         self.work.residuals_ratio = []
 
         # ADMM algorithm

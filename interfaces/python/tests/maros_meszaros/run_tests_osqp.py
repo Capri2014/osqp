@@ -143,7 +143,8 @@ problem_names = [f[:-4] for f in lst_probs]
 # 'QSHIP04S':
 
 # Solve only few problems
-# problem_names = ['QAFIRO', 'CVXQP1_S', 'QSHIP04S']
+problem_names = ['QAFIRO', 'CVXQP1_S', 'QSHIP04S', 'PRIMAL4']
+# problem_names = ['CVXQP1_S']
 
 # Problems index
 p = 0
@@ -152,9 +153,9 @@ p = 0
 n_unsolved = 0
 
 # OSQP Settings
-settings = {'rho': 0.1,
+settings = {'rho': 0.2,
             'auto_rho': False,
-            'verbose': False,
+            'verbose': True,
             'scaled_termination': False,
             'polish': False,
             'scaling': True,
