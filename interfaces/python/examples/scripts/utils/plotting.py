@@ -1,9 +1,9 @@
 import matplotlib as mpl
-mpl.use('pgf')  # Export pgf figures
+# mpl.use('pgf')  # Export pgf figures
 import matplotlib.pylab as plt
 
 import os
-from .timing import gen_stats_array_vec
+from .statistics import gen_stats_array_vec
 
 # Text width in pt
 # -> Get this from LaTeX using \the\textwidth
@@ -43,27 +43,33 @@ def generate_plot(example_name, unit, statistics_name, n_vec, solvers,
     ax = plt.gca()
 
     for (solver_name, solver_stats) in solvers.items():
-        temp_vec, idx_val = gen_stats_array_vec(statistics_name, solver_stats)
-        plt.loglog(n_vec[idx_val], temp_vec, label=r"$\mbox{%s}$" % solver_name)
+        # If plotting iterations, consider only OSQP
+        if (unit == 'iterations' and solver_name[:4] == 'OSQP') or \
+                (unit != 'iterations'):
+            temp_vec, idx_val = gen_stats_array_vec(statistics_name,
+                                                    solver_stats)
+            plt.loglog(n_vec[idx_val], temp_vec, label=r"$\mbox{%s}$" %
+                       solver_name)
 
     plt.legend()
     plt.grid()
     ax.set_xlabel(r'$n$')
 
-    if unit == 'time':
+    if unit == 'timings':
         ax.set_ylabel(r'$\mbox{Time }[s]$')
-    elif unit == 'iter':
+    elif unit == 'iterations':
         ax.set_ylabel(r'$\mathrm{Iterations}$')
     else:
         raise ValueError('Unrecognized y unit')
 
     #  ax.set_title(statistics_name.title())
     plt.tight_layout()
-    plt.show(block=False)
+    # plt.show(block=False)
 
     plots_dir = 'scripts/%s/plots' % example_name
     if not os.path.isdir(plots_dir):
         os.makedirs(plots_dir)
 
     # Save figure
-    plt.savefig('%s/%s_%s.pdf' % (plots_dir, plot_name, statistics_name))
+    plt.savefig('%s/%s_%s_%s.pdf' % (plots_dir, plot_name, unit,
+                                     statistics_name))
