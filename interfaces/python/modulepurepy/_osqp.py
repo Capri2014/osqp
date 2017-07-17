@@ -160,6 +160,8 @@ class settings(object):
         self.warm_start = kwargs.pop('warm_start', True)
         self.polish = kwargs.pop('polish', True)
         self.pol_refine_iter = kwargs.pop('pol_refine_iter', 3)
+        self.diagonal_rho = kwargs.pop('diagonal_rho', False)
+        self.update_rho = kwargs.pop('update_rho', False)
         # self.auto_rho = kwargs.pop('auto_rho', True)
 
 
@@ -422,7 +424,6 @@ class OSQP(object):
         RHO_MAX = 1e06
         RHO_TOL = 1e-08
         RHO_MID = 0.2
-        SAME_RHO = False
         m = self.work.data.m
         rho_vec = np.zeros(m)
 
@@ -433,7 +434,7 @@ class OSQP(object):
         l = self.work.data.l
         u = self.work.data.u
 
-        if SAME_RHO:
+        if not self.work.settings.diagonal_rho:
             rho_vec = RHO_MID * np.ones(m)
             ineq_idx = np.ones(m, dtype=bool)
         else:
@@ -505,6 +506,10 @@ class OSQP(object):
             print("polish: on")
         else:
             print("polish: off")
+        if settings.diagonal_rho:
+            print("          diagonal rho")
+        if settings.update_rho:
+            print("          update rho")
 
         print("")
 
@@ -954,7 +959,6 @@ class OSQP(object):
             self.scale_data()
 
         # Compute in case
-        # if self.work.settings.auto_rho:
         self.compute_rho()
 
         # Factorize KKT
@@ -1360,7 +1364,8 @@ class OSQP(object):
             self.store_plotting_vars()
 
             # Update rho?
-            self.change_rho()
+            if self.work.settings.update_rho:
+                self.change_rho()
 
             # Check algorithm termination
             if self.work.settings.early_terminate:

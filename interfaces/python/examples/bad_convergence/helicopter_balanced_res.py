@@ -13,11 +13,10 @@ with open('./data/%s.pickle' % 'helicopter_balanced_residuals', 'rb') as f:
 # OSQP settings
 osqp_settings = {'verbose': True,
                  'scaling': True,
-                 'scaling_iter': 100,
                  'early_terminate_interval': 1,
-                 'auto_rho': True,
-                 'alpha': 1.6,
-                 'rho': 0.01,
+                 'rho': 1.0,
+                 'diagonal_rho': True,
+                 'update_rho': False,
                  'polish': False}
 
 
