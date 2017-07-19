@@ -18,9 +18,12 @@ readOptions.rho_eqScale = 1000;
 readOptions.rho_eqShift = 0;
 
 %create the problem import settings
+readOptions.makeOneSided            = false;
 readOptions.primalPreScaling        = true;
 readOptions.primalPreScalingNorm    = 1;
-readOptions.dualPreScaling          = false;
+readOptions.dualPreScaling          = true;
+readOptions.dualPreScalingNorm      = 1;
 readOptions.perfectScaling          = false;
+readOptions.nonConvexScaling        = false;
 readOptions.manualScaling           = true;  %scale manually if not required of OSQP
 readOptions.ruizNorm                = 2;

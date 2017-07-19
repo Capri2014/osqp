@@ -20,6 +20,8 @@ addParameter(p,'primalPreScalingNorm',          2);
 addParameter(p,'dualPreScalingNorm',            2);
 addParameter(p,'ruizNorm',                      2);
 addParameter(p,'equalityRescaling',             1);
+addParameter(p,'rho_eqScale',                   1);
+addParameter(p,'rho_eqShift',                   0);
 
 %update from external options
 parse(p,readOptions);

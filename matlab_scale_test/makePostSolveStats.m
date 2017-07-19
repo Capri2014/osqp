@@ -39,7 +39,7 @@ uq = problem.q;
 sq = work.data.q;  %same as sD*uq;
 
 %% A bunch of statistics relating to the KKT matrix
-sRho   = work.settings.rho;
+sRho   = work.settings.rho_ineq;
 sSigma = work.settings.sigma;
 
 [m,n] = deal(size(sA,1),size(sP,1));
@@ -76,7 +76,9 @@ stats.oneNormCond_u      = max(oneNorms_u)./min(oneNorms_u);
 stats.twoNormCond_u      = max(twoNorms_u)./min(twoNorms_u);
 %stats.condNumberKKT_s  = condest(KKTs);
 
-stats.rho = sRho;
+stats.rho_ineq = work.settings.rho_ineq;
+stats.rho_eq = work.settings.rho_eq;
+stats.rho = work.settings.rho_ineq;
 stats.sigma = sSigma;
 stats.alpha = work.settings.alpha;
 

@@ -14,8 +14,8 @@ osqpOptions.max_iter = 2500;
 osqpOptions.alpha = 1.6;
 osqpOptions.verbose = 0;
 
-readOptions.rho_eqScale = 1000;
-readOptions.rho_eqShift = 0;
+readOptions.rho_eqScale = 0;
+readOptions.rho_eqShift = 1e6;
 
 %create the problem import settings
 readOptions.primalPreScaling        = true;

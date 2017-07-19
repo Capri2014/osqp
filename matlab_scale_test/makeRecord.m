@@ -31,8 +31,9 @@ if(~preSolveFlag)
         for j = 1:length(sigVals)
             %solve the problem with new options (new solver)
             %options.alpha = alphaVals(i);
-            osqpOptions.rho   = rhoVals(i);
-            osqpOptions.sigma = sigVals(j);
+            osqpOptions.rho_ineq   = rhoVals(i);
+            osqpOptions.rho_eq     = rhoVals(i)*readOptions.rho_eqScale + readOptions.rho_eqShift;
+            osqpOptions.sigma      = sigVals(j);
             
             solver = osqp;
             solver.setup(problem.P,problem.q,problem.A,problem.l,problem.u,osqpOptions);
