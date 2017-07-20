@@ -41,39 +41,55 @@ def scale_constraints(problem):
     """
     m_constraints = len(problem.l)
     E = np.zeros(m_constraints)
+
+    # Scaling by max value
     for i in range(m_constraints):
-        abs_l = np.abs(problem.l[i])
-        if np.isinf(abs_l) or abs_l > 1e10 or abs_l < 1e-06:
-            abs_l = 1.
-        else:
-            abs_l = constrain_scaling(abs_l, 1e-03, 1e03)
+        abs_l_i = np.abs(problem.l[i])
+        if np.isinf(abs_l_i) or abs_l_i > 1e15 or abs_l_i < 1e-06:
+            abs_l_i = 1.
 
-        abs_u = np.abs(problem.u[i])
-        if np.isinf(abs_u) or abs_u > 1e10 or abs_l < 1e-06:
-            abs_u = 1.
-        else:
-            abs_u = constrain_scaling(abs_u, 1e-03, 1e03)
+        abs_u_i = np.abs(problem.u[i])
+        if np.isinf(abs_u_i) or abs_u_i > 1e15 or abs_u_i < 1e-06:
+            abs_u_i = 1.
 
-        # # Scale using maximum bound
-        # max_abs_bnds = np.minimum(abs_l, abs_u)
-        # E[i] = 1./max_abs_bnds
+        # Scale using maximum bound
+        max_abs_bnds = np.maximum(abs_l_i, abs_u_i)
+        E[i] = 1./max_abs_bnds
 
-        # Scale using both bounds
-        # E[i] = 1. / (abs_l * abs_u)
-
-        # Exponentially scale bounds
-        log_l = np.log(abs_l)
-        log_u = np.log(abs_u)
-        E[i] = np.exp((log_l + log_u)/2)
+    # Scaling logarithm
+    # for i in range(m_constraints):
+    #     abs_l = np.abs(problem.l[i])
+    #     if np.isinf(abs_l) or abs_l > 1e10 or abs_l < 1e-06:
+    #         abs_l = 1.
+    #     else:
+    #         abs_l = constrain_scaling(abs_l, 1e-03, 1e03)
+    #
+    #     abs_u = np.abs(problem.u[i])
+    #     if np.isinf(abs_u) or abs_u > 1e10 or abs_l < 1e-06:
+    #         abs_u = 1.
+    #     else:
+    #         abs_u = constrain_scaling(abs_u, 1e-03, 1e03)
+    #
+    #     # # Scale using maximum bound
+    #     # max_abs_bnds = np.minimum(abs_l, abs_u)
+    #     # E[i] = 1./max_abs_bnds
+    #
+    #     # Scale using both bounds
+    #     # E[i] = 1. / (abs_l * abs_u)
+    #
+    #     # Exponentially scale bounds
+    #     log_l = np.log(abs_l)
+    #     log_u = np.log(abs_u)
+    #     E[i] = np.exp((log_l + log_u)/2)
 
     # Select scaling
-    # E = spa.diags(E)
-    E = spa.diags(np.ones(m_constraints))
+    E = spa.diags(E)
+    # E = spa.diags(np.ones(m_constraints))
 
     # New constraints
-    problem.l = E.dot(m.l)
-    problem.u = E.dot(m.u)
-    problem.A = E.dot(m.A).tocsc()
+    problem.l = E.dot(problem.l)
+    problem.u = E.dot(problem.u)
+    problem.A = E.dot(problem.A).tocsc()
 
 
 def solve_problem(name, settings):
@@ -84,10 +100,10 @@ def solve_problem(name, settings):
     problem = load_maros_meszaros_problem(prob_dir + "/" + name)  # Load prob
 
     # Scale cost
-    # scale_cost(problem)
+    scale_cost(problem)
 
     # Scale constraints
-    # scale_constraints(problem)
+    scale_constraints(problem)
 
     # Solve with OSQP
     # s = osqp.OSQP()
@@ -107,9 +123,30 @@ def solve_problem(name, settings):
     else:
         solved = True
 
-    print("%s  \t\t%s" % (name, res.info.status))
+    print("%s        \t\t%s" % (name, res.info.status))
 
     return solved, res.info.iter
+
+
+def select_small_problems(problems):
+    """
+    Select only problems with less than
+        - 1000 variables
+        - 1000 constraints
+    """
+
+    new_problems = []
+
+    for problem in problems:
+        p = load_maros_meszaros_problem(prob_dir + "/" + problem)
+
+        # Get dimensions
+        (m, n) = p.A.shape
+
+        if m <= 1000 and n <= 1000:
+            new_problems.append(problem)
+
+    return new_problems, len(new_problems)
 
 
 '''
@@ -118,12 +155,15 @@ Main script
 
 # Directory of problems
 prob_dir = './mat'
-lst_probs = os.listdir(prob_dir)
-
+lst_probs = os.listdir(prob_dir)  # List of problems
 # Count number of problems
-n_prob = len([name for name in lst_probs
-             if os.path.isfile(prob_dir + "/" + name)])
-problem_names = [f[:-4] for f in lst_probs]
+# n_prob = len([name for name in lst_probs
+#              if os.path.isfile(prob_dir + "/" + name)])
+problems = [f[:-4] for f in lst_probs]
+n_prob = len(problems)
+
+# Select small problems
+problems, n_prob = select_small_problems(problems)
 
 # List of interesting probs
 # 'QAFIRO' or name == 'CVXQP1_S':
@@ -143,8 +183,8 @@ problem_names = [f[:-4] for f in lst_probs]
 # 'QSHIP04S':
 
 # Solve only few problems
-problem_names = ['QAFIRO', 'CVXQP1_S', 'QSHIP04S', 'PRIMAL4']
-# problem_names = ['CVXQP1_S']
+# problems = ['QAFIRO', 'CVXQP1_S', 'QSHIP04S', 'PRIMAL4']
+# problems = ['CVXQP1_S']
 
 # Problems index
 p = 0
@@ -153,15 +193,17 @@ p = 0
 n_unsolved = 0
 
 # OSQP Settings
-settings = {'rho': 0.2,
-            'auto_rho': False,
-            'verbose': True,
+settings = {'rho': 1.0,
+            'verbose': False,
             'scaled_termination': False,
+            'diagonal_rho': False,
+            'update_rho': True,
+            'line_search': False,
             'polish': False,
             'scaling': True,
             'early_terminate_interval': 1}
 
-parallel = False  # Execute script in parallel
+parallel = True  # Execute script in parallel
 
 # Results
 results = []
@@ -176,10 +218,10 @@ Solve all Maros-Meszaros problems
 if parallel:
     # Parallel
     pool = Pool(processes=cpu_count())
-    results = pool.starmap(solve_problem, zip(problem_names, repeat(settings)))
+    results = pool.starmap(solve_problem, zip(problems, repeat(settings)))
 else:
     # Serial
-    for name in problem_names:
+    for name in problems:
         # Solve single problem
         results.append(solve_problem(name, settings))
 
@@ -191,6 +233,9 @@ solved = list(zipped_results[0])
 n_iter = list(zipped_results[1])
 unsolved = np.invert(solved)
 
+avg_niter = np.mean([x for x in n_iter if x < 2500])
+
 print('Number of solved problems %i/%i' % (n_prob - sum(unsolved),
                                            n_prob))
+print("Average number of iterations (solved probs) %.2f" % (avg_niter))
 print("Time elapsed %.2e sec" % elapsed_time)

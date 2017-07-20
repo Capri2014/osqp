@@ -163,7 +163,7 @@ class settings(object):
         self.diagonal_rho = kwargs.pop('diagonal_rho', False)
         self.update_rho = kwargs.pop('update_rho', False)
         # self.auto_rho = kwargs.pop('auto_rho', True)
-
+        self.rho_mid = kwargs.pop('rho', False)
 
 
 class scaling(object):
@@ -422,8 +422,8 @@ class OSQP(object):
         """
         RHO_MIN = 1e-06
         RHO_MAX = 1e06
-        RHO_TOL = 1e-08
-        RHO_MID = 0.2
+        RHO_TOL = 1e-04
+        RHO_MID = self.work.settings.rho_mid
         m = self.work.data.m
         rho_vec = np.zeros(m)
 
@@ -446,7 +446,7 @@ class OSQP(object):
                     # One sided constraint
                     rho_vec[i] = RHO_MID
                     ineq_idx[i] = True
-                elif np.abs(u[i] - l[i]) < 1e-08:
+                elif np.abs(u[i] - l[i]) < RHO_TOL:
                     # Equality constraint
                     rho_vec[i] = RHO_MAX
                 else:
@@ -510,6 +510,7 @@ class OSQP(object):
             print("          diagonal rho")
         if settings.update_rho:
             print("          update rho")
+        print("          rho_mid = %.3e" % settings.rho_mid)
 
         print("")
 
@@ -1102,7 +1103,9 @@ class OSQP(object):
 
         if cos_angle_delta_q > (1 - EPS_ACTIVATION_ACCELERATION):
             # Colinear vectors -> perform acceleration!
-            print("Perform acceleration   ", end='')
+
+            if self.work.settings.verbose:
+                print("Perform acceleration   ", end='')
 
             # Compute next residual (apply operator T again)
             q_next_next_nom = self.operator_T(q_next)
@@ -1132,7 +1135,8 @@ class OSQP(object):
                 # print("||r^{k+1}|| < ||\\bar{r}^{k+1}|| : %r" % condition_acc)
 
                 if condition_acc:
-                    print("better alpha found! alpha = %.4f" % alpha)
+                    if self.work.settings.verbose:
+                        print("better alpha found! alpha = %.4f" % alpha)
                     q_next = q_temp
 
                     # Store norm of q for plotting
@@ -1156,7 +1160,7 @@ class OSQP(object):
 
                 # alpha = ALPHA_RED * alpha
 
-            if alpha < self.work.settings.alpha:
+            if alpha < self.work.settings.alpha and self.work.settings.verbose:
                 print("no better alpha found!")
             # import ipdb; ipdb.set_trace()
 
