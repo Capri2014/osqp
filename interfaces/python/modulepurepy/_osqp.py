@@ -1338,6 +1338,10 @@ class OSQP(object):
         """
         Solve QP problem using OSQP
         """
+        # Dimensions for easier notation
+        m = self.work.data.m
+        n = self.work.data.n
+
         # Start timer
         self.work.timer = time.time()
 
@@ -1369,7 +1373,15 @@ class OSQP(object):
 
             # Update rho?
             if self.work.settings.update_rho:
+                # Rho update based on the residuals
                 self.change_rho()
+
+                # Update using bouncing values
+                # if iter % 2 == 0:
+                #     new_rho = spspa.diags(1e3 * np.ones(m))
+                # else:
+                #     new_rho = spspa.diags(1e-3 * np.ones(m))
+                # self.update_rho(new_rho)
 
             # Check algorithm termination
             if self.work.settings.early_terminate:

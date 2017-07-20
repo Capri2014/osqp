@@ -24,15 +24,27 @@ def scale_cost(problem):
     """
     Normalize cost by linear part of the cost.
     """
-    norm_q = np.linalg.norm(problem.q)
-    cost_scal = constrain_scaling(norm_q, 1e-03, 1e03)
-    if norm_q < 1e-06:  # q is null!
-        cost_scal = 1.
-    else:
-        cost_scal = norm_q
 
-    problem.q /= cost_scal
-    problem.P /= cost_scal
+    # Scaling
+    scaling = 1.0
+
+    # Get norms
+    norm_q = np.linalg.norm(problem.q)
+    norm_P = np.linalg.norm(problem.P.todense())
+    trP = np.sum(problem.P.diagonal())
+    # cost_scal = constrain_scaling(norm_q, 1e-03, 1e03)
+    # if norm_q < 1e-06:  # q is null!
+    #     cost_scal = 1.
+    # else:
+    #     cost_scal = norm_q
+
+    # Scaling
+    scaling = np.minimum(np.maximum(trP + norm_q, 1e-06), 1e+6)
+
+    # print("scaling = %.2e" % scaling)
+
+    problem.q /= scaling
+    problem.P /= scaling
 
 
 def scale_constraints(problem):
@@ -100,10 +112,10 @@ def solve_problem(name, settings):
     problem = load_maros_meszaros_problem(prob_dir + "/" + name)  # Load prob
 
     # Scale cost
-    scale_cost(problem)
+    # scale_cost(problem)
 
     # Scale constraints
-    scale_constraints(problem)
+    # scale_constraints(problem)
 
     # Solve with OSQP
     # s = osqp.OSQP()
@@ -123,7 +135,7 @@ def solve_problem(name, settings):
     else:
         solved = True
 
-    print("%s        \t\t%s" % (name, res.info.status))
+    print("%s            \t\t%s" % (name, res.info.status))
 
     return solved, res.info.iter
 
@@ -184,7 +196,7 @@ problems, n_prob = select_small_problems(problems)
 
 # Solve only few problems
 # problems = ['QAFIRO', 'CVXQP1_S', 'QSHIP04S', 'PRIMAL4']
-# problems = ['CVXQP1_S']
+problems = ['CVXQP1_S']
 
 # Problems index
 p = 0
@@ -193,17 +205,17 @@ p = 0
 n_unsolved = 0
 
 # OSQP Settings
-settings = {'rho': 1.0,
-            'verbose': False,
+settings = {'rho': 120,
+            'verbose': True,
             'scaled_termination': False,
-            'diagonal_rho': False,
-            'update_rho': True,
+            'diagonal_rho': True,
+            'update_rho': False,
             'line_search': False,
             'polish': False,
             'scaling': True,
             'early_terminate_interval': 1}
 
-parallel = True  # Execute script in parallel
+parallel = False  # Execute script in parallel
 
 # Results
 results = []
