@@ -4,7 +4,7 @@ import scipy.sparse as sparse
 import scipy as sp
 import numpy as np
 import mathprogbasepy as mpbpy
-sp.random.seed(5)
+sp.random.seed(3)
 
 n = 50
 m = 100
@@ -13,16 +13,16 @@ lA = -sp.rand(m) * 2.
 uA = sp.rand(m) * 2.
 
 
-n_eq = 15
-# eyeI = sparse.random(n_eq, n_eq, density=0.2)
-eyeI = sparse.eye(n_eq)
-A = sparse.vstack([A,
-                   sparse.hstack([eyeI, sparse.csc_matrix((n_eq, n - n_eq))])
-                   ])
-leq = np.random.rand(n_eq)
-ueq = leq
-lA = np.append(lA, leq)
-uA = np.append(uA, ueq)
+# n_eq = 5
+# # eyeI = sparse.random(n_eq, n_eq, density=0.2)
+# eyeI = sparse.eye(n_eq)
+# A = sparse.vstack([A,
+#                    sparse.hstack([eyeI, sparse.csc_matrix((n_eq, n - n_eq))])
+#                    ]).tocsc()
+# leq = np.random.rand(n_eq)
+# ueq = leq
+# lA = np.append(lA, leq)
+# uA = np.append(uA, ueq)
 
 
 # A = sparse.eye(n).tocsc()
