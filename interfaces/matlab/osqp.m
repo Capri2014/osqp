@@ -1,5 +1,5 @@
 classdef osqp < handle
-    % osqp interface class for OSQP solver v0.1.1
+    % osqp interface class for OSQP solver v0.1.2
     % This class provides a complete interface to the C implementation
     % of the OSQP solver.
     %
@@ -496,7 +496,7 @@ end
 function currentSettings = validateSettings(this,isInitialization,varargin)
 
 %don't allow these fields to be changed
-unmodifiableFields = {'scaling','scaling_iter'};
+unmodifiableFields = {'scaling','scaling_iter', 'scaling_norm'};
 
 %get the current settings
 if(isInitialization)

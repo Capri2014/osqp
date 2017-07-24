@@ -4,39 +4,37 @@
  * Auxiliary functions needed to compute ADMM iterations * *
  ***********************************************************/
  #ifndef EMBEDDED
-
-
  void compute_rho(OSQPWorkspace * work){
-    c_float trP, trAtA, ratio;
-    c_int n, m;
-
-    if (work->data->m == 0){ // No consraints. Use max rho
-        work->settings->rho = AUTO_RHO_MAX;
-        return;
-    }
-
-    n = work->data->n;
-    m = work->data->m;
-
-    // Depends only on n and m
-    /* work->settings->rho = AUTO_RHO_BETA0 * */
-    /*                       pow(work->data->n, AUTO_RHO_BETA1) * */
-    /*                       pow(work->data->m, AUTO_RHO_BETA2); */
-
-    // Old stuff with traces
-    // Compute tr(P)
-    trP = mat_trace(work->data->P);
-
-    // Compute tr(AtA) = fro(A) ^ 2
-    trAtA = mat_fro_sq(work->data->A);
-
-    // Compute rho = beta0 * (trP + sigma * n)^(beta1) * (trAtA)^(beta2)
-    work->settings->rho = AUTO_RHO_BETA0 *
-                          pow((trP + work->settings->sigma * n)/n , AUTO_RHO_BETA1) *
-                          pow((trAtA) / m, AUTO_RHO_BETA2);
-
-
-    work->settings->rho = c_min(c_max(work->settings->rho, AUTO_RHO_MIN), AUTO_RHO_MAX);
+    // c_float trP, trAtA, ratio;
+    // c_int n, m;
+    //
+    // if (work->data->m == 0){ // No consraints. Use max rho
+    //     work->settings->rho = AUTO_RHO_MAX;
+    //     return;
+    // }
+    //
+    // n = work->data->n;
+    // m = work->data->m;
+    //
+    // // Depends only on n and m
+    // /* work->settings->rho = AUTO_RHO_BETA0 * */
+    // /*                       pow(work->data->n, AUTO_RHO_BETA1) * */
+    // /*                       pow(work->data->m, AUTO_RHO_BETA2); */
+    //
+    // // Old stuff with traces
+    // // Compute tr(P)
+    // trP = mat_trace(work->data->P);
+    //
+    // // Compute tr(AtA) = fro(A) ^ 2
+    // trAtA = mat_fro_sq(work->data->A);
+    //
+    // // Compute rho = beta0 * (trP + sigma * n)^(beta1) * (trAtA)^(beta2)
+    // work->settings->rho = AUTO_RHO_BETA0 *
+    //                       pow((trP + work->settings->sigma * n)/n , AUTO_RHO_BETA1) *
+    //                       pow((trAtA) / m, AUTO_RHO_BETA2);
+    //
+    //
+    // work->settings->rho = c_min(c_max(work->settings->rho, AUTO_RHO_MIN), AUTO_RHO_MAX);
  }
  #endif // ifndef EMBEDDED
 
@@ -628,6 +626,17 @@ c_int validate_data(const OSQPData * data){
 }
 
 
+c_int validate_linsys_solver(c_int linsys_solver){
+    if (linsys_solver != SUITESPARSE_LDL){
+        return 1;
+    }
+    // TODO: Add more solvers in case
+
+    // Valid solver
+    return 0;
+}
+
+
 c_int validate_settings(const OSQPSettings * settings){
     if (!settings){
         #ifdef PRINTING
@@ -644,6 +653,13 @@ c_int validate_settings(const OSQPSettings * settings){
     if (settings->scaling_iter < 1) {
         #ifdef PRINTING
         c_print("scaling_iter must be greater than 0\n");
+        #endif
+        return 1;
+    }
+    if (settings->scaling_norm != 1 && settings->scaling_norm != 2 &&
+        settings->scaling_norm != -1) {
+        #ifdef PRINTING
+        c_print("scaling_norm must be wither 1, 2 or -1 (for infinity norm)\n");
         #endif
         return 1;
     }
@@ -708,9 +724,9 @@ c_int validate_settings(const OSQPSettings * settings){
         #endif
         return 1;
     }
-    if (settings->linsys_solver != SUITESPARSE_LDL){
+    if (validate_linsys_solver(settings->linsys_solver)){
         #ifdef PRINTING
-        c_print("linsys_solver must be SUITESPARSE_LDL\n");
+        c_print("linsys_solver not recognized\n");
         #endif
         return 1;
     }

@@ -178,11 +178,12 @@
      OSQPSettings *settings = self->workspace->settings;
 
      PyObject *return_dict = Py_BuildValue(
-         "{s:d,s:d,s:i,s:i,s:i,s:d,s:d,s:d, s:d, s:d, s:i, s:i, s:i, s:i, s:i}",
+         "{s:d,s:d,s:i,s:i,s:i, s:i,s:d,s:d,s:d, s:d, s:d, s:i, s:i, s:i, s:i, s:i}",
          "rho", (double)settings->rho,
          "sigma", (double)settings->sigma,
          "scaling", settings->scaling,
          "scaling_iter", settings->scaling_iter,
+         "scaling_norm", settings->scaling_norm,
          "max_iter", settings->max_iter,
          "eps_abs", (double)settings->eps_abs,
          "eps_rel", (double)settings->eps_rel,
@@ -199,6 +200,18 @@
 
 
 static PyObject *OSQP_get_workspace(OSQP *self){
+
+    // Check if linear systems solver is SUITESPARSE_LDL
+    if(!self->workspace){
+        PyErr_SetString(PyExc_ValueError, "Solver is uninitialized.  No data have been configured.");
+        return (PyObject *) NULL;
+    }
+
+    if(self->workspace->linsys_solver->type != SUITESPARSE_LDL){
+        PyErr_SetString(PyExc_ValueError, "OSQP setup was not performed using SuiteSparse LDL! Run setup with linsys_solver as SuiteSparse LDL");
+        return (PyObject *) NULL;
+    }
+
      PyObject *data_py = OSQP_get_data(self);
      PyObject *linsys_solver_py = OSQP_get_linsys_solver(self);
      PyObject *scaling_py = OSQP_get_scaling(self);
