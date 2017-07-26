@@ -184,6 +184,7 @@ class scaling(object):
         self.E = None
         self.Dinv = None
         self.Einv = None
+        self.cost_scaling = None
 
 
 class solution(object):
@@ -309,6 +310,27 @@ class OSQP(object):
         """
         n = self.work.data.n
         m = self.work.data.m
+
+        # Scale cost
+        SCALE_COST_MIN = 1e-08
+        q_norm = np.maximum(np.linalg.norm(self.work.data.q),
+                            SCALE_COST_MIN)
+        P_avg_norm = np.maximum(np.mean(
+            spspa.linalg.norm(self.work.data.P, axis=0)), SCALE_COST_MIN)
+        A_avg_norm = np.maximum(np.mean(
+            spspa.linalg.norm(self.work.data.A, axis=0)), SCALE_COST_MIN)
+        cost_scaling = A_avg_norm/(q_norm + P_avg_norm)
+
+        # Scale constraints
+        for i in range(m):  # Range over all the constraints
+            # TODO: Continue from here!
+
+
+        # constraints_scaling  # TODO: Complete!
+
+
+
+
         scaling_norm = self.work.settings.scaling_norm
         scaling_norm = scaling_norm if scaling_norm == 1 or scaling_norm == 2 \
             else np.inf
@@ -393,15 +415,12 @@ class OSQP(object):
         else:
             E = spspa.diags(d[self.work.data.n:])
 
-
         # Scale problem Matrices
         P = D.dot(self.work.data.P.dot(D)).tocsc()
         A = E.dot(self.work.data.A.dot(D)).tocsc()
         q = D.dot(self.work.data.q)
         l = E.dot(self.work.data.l)
         u = E.dot(self.work.data.u)
-
-        #  import ipdb; ipdb.set_trace()
 
         # Assign scaled problem
         self.work.data = problem((n, m), P.data, P.indices, P.indptr, q,
@@ -412,7 +431,7 @@ class OSQP(object):
         self.work.scaling.D = D
         self.work.scaling.Dinv = \
             spspa.diags(np.reciprocal(D.diagonal()))
-        self.work.scaling.E = E
+        self.work.scalingselfself.E = E
         if m == 0:
             self.work.scaling.Einv = E
         else:

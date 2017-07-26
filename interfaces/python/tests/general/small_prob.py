@@ -22,11 +22,11 @@ u = random_scaling * sp.rand(m)
 
 # norm_l = np.linalg.norm(l)
 # norm_u = np.linalg.norm(u)
-Escal = 1
+# Escal = 1
 
-A /= Escal
-l /= Escal
-u /= Escal
+# A /= Escal
+# l /= Escal
+# u /= Escal
 
 
 
@@ -54,7 +54,7 @@ norm_q = np.linalg.norm(q)
 
 osqp_opts = {'rho': 0.001,
              'auto_rho': True,
-             'scaling_iter': 15, 
+             'scaling_iter': 15,
              'polish': True,
              'early_terminate_interval': 1,
              'scaling': True}
