@@ -31,9 +31,13 @@ OSQP_NAN = 1e+20  # Just as placeholder. Not real value
 SUITESPARSE_LDL = 0
 
 # Scaling
-SCALING_REG = 1e-08
-#  MAX_SCALING = 1e06
-#  MIN_SCALING = 1e-06
+MAX_SCALING = 1e08
+MIN_SCALING = 1e-08
+
+# Rho vector
+RHO_MIN = 1e-06
+RHO_MAX = 1e06
+RHO_TOL = 1e-04
 
 
 class workspace(object):
@@ -312,14 +316,14 @@ class OSQP(object):
         m = self.work.data.m
 
         # Scale cost
-        SCALE_COST_MIN = 1e-08
-        q_norm = np.linalg.norm(self.work.data.q)
-        q_norm = 1. if q_norm < SCALE_COST_MIN else q_norm
-        P_avg_norm = np.mean(spspa.linalg.norm(self.work.data.P, axis=0))
-        P_avg_norm = 1. if P_avg_norm < SCALE_COST_MIN else P_avg_norm
-        A_avg_norm = np.mean(spspa.linalg.norm(self.work.data.A, axis=0))
-        A_avg_norm = 1. if A_avg_norm < SCALE_COST_MIN else A_avg_norm
-        cost_scaling = A_avg_norm/(q_norm + P_avg_norm)
+        # SCALE_COST_MIN = 1e-08
+        # q_norm = np.linalg.norm(self.work.data.q)
+        # q_norm = 1. if q_norm < SCALE_COST_MIN else q_norm
+        # P_avg_norm = np.mean(spspa.linalg.norm(self.work.data.P, axis=0))
+        # P_avg_norm = 1. if P_avg_norm < SCALE_COST_MIN else P_avg_norm
+        # A_avg_norm = np.mean(spspa.linalg.norm(self.work.data.A, axis=0))
+        # A_avg_norm = 1. if A_avg_norm < SCALE_COST_MIN else A_avg_norm
+        # cost_scaling = A_avg_norm/(q_norm + P_avg_norm)
 
         # Scale data (just to check)
         # self.work.data.P /= cost_scaling
@@ -358,8 +362,12 @@ class OSQP(object):
                     norm_col_j = np.linalg.norm(KKT[:, j].todense(),
                                                 scaling_norm)
 
-                if norm_col_j > SCALING_REG:
-                    d_temp[j] = 1./(np.sqrt(norm_col_j))
+                if norm_col_j < MIN_SCALING:
+                    norm_col_j = 1.
+                elif norm_col_j > MAX_SCALING:
+                    norm_col_j = MAX_SCALING
+
+                d_temp[j] = 1./(np.sqrt(norm_col_j))
 
             S_temp = spspa.diags(d_temp)
             d = np.multiply(d, d_temp)
@@ -442,9 +450,7 @@ class OSQP(object):
         """
         Automatically compute rho value
         """
-        RHO_MIN = 1e-06
-        RHO_MAX = 1e06
-        RHO_TOL = 1e-04
+
 
         if self.work.settings.auto_rho:
             # Norm q

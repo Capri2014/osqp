@@ -4,13 +4,16 @@ import scipy.sparse as sparse
 import scipy as sp
 import numpy as np
 import mathprogbasepy as mpbpy
-sp.random.seed(5)
+sp.random.seed(6)
 
 n = 50
 m = 100
 A = sparse.random(m, n, density=0.4, format='csc')
 lA = -sp.rand(m) * 2.
 uA = sp.rand(m) * 2.
+
+# Create some quality constraints
+lA[-3:-1] = uA[-3:-1]
 
 # Shift bounds
 # lA[-1] = lA[-1] + 1e6
@@ -64,6 +67,7 @@ model.setup(P=P, q=q, A=A, l=lA, u=uA, **osqp_opts)
 res_osqp = model.solve()
 
 # osqp_opts['line_search'] = True
+osqp_opts['diagonal_rho'] = True
 
 s = osqppurepy.OSQP()
 s.setup(P, q, A, lA, uA, **osqp_opts)
