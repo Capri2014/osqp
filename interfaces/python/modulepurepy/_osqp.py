@@ -313,13 +313,17 @@ class OSQP(object):
 
         # Scale cost
         SCALE_COST_MIN = 1e-08
-        q_norm = np.maximum(np.linalg.norm(self.work.data.q),
-                            SCALE_COST_MIN)
-        P_avg_norm = np.maximum(np.mean(
-            spspa.linalg.norm(self.work.data.P, axis=0)), SCALE_COST_MIN)
-        A_avg_norm = np.maximum(np.mean(
-            spspa.linalg.norm(self.work.data.A, axis=0)), SCALE_COST_MIN)
+        q_norm = np.linalg.norm(self.work.data.q)
+        q_norm = 1. if q_norm < SCALE_COST_MIN else q_norm
+        P_avg_norm = np.mean(spspa.linalg.norm(self.work.data.P, axis=0))
+        P_avg_norm = 1. if P_avg_norm < SCALE_COST_MIN else P_avg_norm
+        A_avg_norm = np.mean(spspa.linalg.norm(self.work.data.A, axis=0))
+        A_avg_norm = 1. if A_avg_norm < SCALE_COST_MIN else A_avg_norm
         cost_scaling = A_avg_norm/(q_norm + P_avg_norm)
+
+        # Scale data (just to check)
+        # self.work.data.P /= cost_scaling
+        # self.work.data.q /= cost_scaling
 
         # # Scale constraints
         # for i in range(m):  # Range over all the constraints
