@@ -136,7 +136,7 @@ class settings(object):
     warm_start [False]                  - Reuse solution from previous solve
     polish  [True]                      - Solution polish
     pol_refine_iter  [3]                - Number of iterative refinement iterations
-    # auto_rho  [True]                    - Automatic rho computation
+    auto_rho  [True]                    - Automatic rho computation
     """
 
     def __init__(self, **kwargs):
@@ -164,7 +164,7 @@ class settings(object):
         self.pol_refine_iter = kwargs.pop('pol_refine_iter', 3)
         self.diagonal_rho = kwargs.pop('diagonal_rho', False)
         self.update_rho = kwargs.pop('update_rho', False)
-        # self.auto_rho = kwargs.pop('auto_rho', True)
+        self.auto_rho = kwargs.pop('auto_rho', False)
         self.rho_mid = kwargs.pop('rho', False)
 
 
@@ -321,15 +321,11 @@ class OSQP(object):
             spspa.linalg.norm(self.work.data.A, axis=0)), SCALE_COST_MIN)
         cost_scaling = A_avg_norm/(q_norm + P_avg_norm)
 
-        # Scale constraints
-        for i in range(m):  # Range over all the constraints
-            # TODO: Continue from here!
-
+        # # Scale constraints
+        # for i in range(m):  # Range over all the constraints
+        #     # TODO: Continue from here!
 
         # constraints_scaling  # TODO: Complete!
-
-
-
 
         scaling_norm = self.work.settings.scaling_norm
         scaling_norm = scaling_norm if scaling_norm == 1 or scaling_norm == 2 \
@@ -431,7 +427,7 @@ class OSQP(object):
         self.work.scaling.D = D
         self.work.scaling.Dinv = \
             spspa.diags(np.reciprocal(D.diagonal()))
-        self.work.scalingselfself.E = E
+        self.work.scaling.E = E
         if m == 0:
             self.work.scaling.Einv = E
         else:
@@ -445,7 +441,27 @@ class OSQP(object):
         RHO_MIN = 1e-06
         RHO_MAX = 1e06
         RHO_TOL = 1e-04
-        RHO_MID = self.work.settings.rho_mid
+
+        if self.work.settings.auto_rho:
+            # Norm q
+            norm_q = np.linalg.norm(self.work.data.q)
+            norm_q = norm_q if norm_q > 1e-6 else 1.
+
+            # Norm P
+            # norm_P = np.mean(spspa.linalg.norm(self.work.data.P, axis=0))
+            # norm_P = np.linalg.norm(self.work.data.P)
+            norm_P = np.sum(self.work.data.P.diagonal())
+            norm_P = norm_P if norm_P > 1e-6 else 1.
+
+            # Norm A
+            norm_A = np.sum(self.work.data.A.T.dot(self.work.data.A))
+
+            RHO_MID = (norm_q + norm_P)/norm_A
+
+            self.work.settings.rho_mid = RHO_MID
+        else:
+            RHO_MID = self.work.settings.rho_mid
+
         m = self.work.data.m
         rho_vec = np.zeros(m)
 

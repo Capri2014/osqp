@@ -196,7 +196,7 @@ problems, n_prob = select_small_problems(problems)
 
 # Solve only few problems
 # problems = ['QAFIRO', 'CVXQP1_S', 'QSHIP04S', 'PRIMAL4']
-problems = ['CVXQP1_S']
+# problems = ['CVXQP1_S']
 
 # Problems index
 p = 0
@@ -205,10 +205,11 @@ p = 0
 n_unsolved = 0
 
 # OSQP Settings
-settings = {'rho': 120,
-            'verbose': True,
+settings = {'rho': 1.0,
+            'verbose': False,
             'scaled_termination': False,
             'diagonal_rho': True,
+            'auto_rho': False,
             'update_rho': False,
             'line_search': False,
             'polish': False,
