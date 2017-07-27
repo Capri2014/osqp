@@ -118,16 +118,16 @@ def solve_problem(name, settings):
     # scale_constraints(problem)
 
     # Solve with OSQP
-    # s = osqp.OSQP()
-    # s.setup(problem.P, problem.q, problem.A, problem.l, problem.u,
-    #         **settings)
-    # res = s.solve()
-
-    # Solve with purepy
-    s = osqpurepy.OSQP()
+    s = osqp.OSQP()
     s.setup(problem.P, problem.q, problem.A, problem.l, problem.u,
             **settings)
     res = s.solve()
+
+    # Solve with purepy
+    # s = osqpurepy.OSQP()
+    # s.setup(problem.P, problem.q, problem.A, problem.l, problem.u,
+    #         **settings)
+    # res = s.solve()
 
     if res.info.status_val == \
             s.constant('OSQP_MAX_ITER_REACHED'):
@@ -155,7 +155,7 @@ def select_small_problems(problems):
         # Get dimensions
         (m, n) = p.A.shape
 
-        if m <= 1000 and n <= 1000:
+        if m <= 1500 and n <= 500:
             new_problems.append(problem)
 
     return new_problems, len(new_problems)
@@ -205,13 +205,15 @@ p = 0
 n_unsolved = 0
 
 # OSQP Settings
-settings = {'rho': 1.0,
+settings = {'rho': 1.,
             'verbose': False,
             'scaled_termination': False,
-            'diagonal_rho': True,
-            'auto_rho': False,
-            'update_rho': False,
-            'line_search': False,
+            # 'diagonal_rho': True,
+            # 'auto_rho': False,
+            # 'update_rho': False,
+            # 'line_search': False,
+            'max_iter': 2500,
+            'scaling_norm': -1,
             'polish': False,
             'scaling': True,
             'early_terminate_interval': 1}
