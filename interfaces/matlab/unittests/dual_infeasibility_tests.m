@@ -19,7 +19,7 @@ classdef dual_infeasibility_tests < matlab.unittest.TestCase
             % Set options
             testCase.options = struct;
             testCase.options.verbose = 0;
-            testCase.options.rho = 0.01;
+            testCase.options.rho_ineq = 0.01;
             testCase.options.eps_abs = 1e-04;
             testCase.options.eps_rel = 1e-04;
             testCase.options.eps_prim_inf = 1e-15;  % Focus only on dual infeasibility

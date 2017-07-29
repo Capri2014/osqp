@@ -251,7 +251,8 @@ static char * test_basic_qp_update_rho()
     // Define Solver settings as default
     rho = 0.7;
     set_default_settings(settings);
-    settings->rho = rho;
+    settings->rho_eq = rho;
+    settings->rho_ineq = rho;
     settings->early_terminate_interval = 1;
 
     // Setup workspace
@@ -289,7 +290,7 @@ static char * test_basic_qp_update_rho()
 
     // Create new problem with different rho and update it
     set_default_settings(settings);
-    settings->rho = 0.1;
+    settings->rho_ineq = 0.1;
     settings->early_terminate_interval = 1;
 
     // Setup workspace
@@ -299,7 +300,7 @@ static char * test_basic_qp_update_rho()
     mu_assert("Update rho test update: Setup error!", work != OSQP_NULL);
 
     // Update rho
-    exitflag = osqp_update_rho(work, rho);
+    exitflag = osqp_update_rho(work, rho, rho);
     mu_assert("Update rho test update: Error update rho!", exitflag == 0);
 
     // Solve Problem

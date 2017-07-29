@@ -6,21 +6,16 @@
 #if EMBEDDED != 1
 void set_rho_vec(OSQPWorkspace * work){
     c_int i;
-    work->settings->rho = c_min(c_max(work->settings->rho, RHO_MIN), RHO_MAX);
 
     for(i=0; i < work->data->m; i++){
-        if ( (work->data->l[i] < -OSQP_INFTY*MIN_SCALING) && (work->data->u[i] > OSQP_INFTY*MIN_SCALING) ) {
-            // Loose bounds
-            work->constr_type[i] = -1;
-            work->rho_vec[i] = RHO_MIN;
-        } else if (work->data->u[i] - work->data->l[i] < RHO_TOL) {
+        if (work->data->u[i] - work->data->l[i] < RHO_TOL) {
             // Equality constraints
             work->constr_type[i] = 1;
-            work->rho_vec[i] = RHO_MAX;
+            work->rho_vec[i] = work->settings->rho_eq;
         } else {
             // Inequality constraints
             work->constr_type[i] = 0;
-            work->rho_vec[i] = work->settings->rho;
+            work->rho_vec[i] = work->settings->rho_ineq;
         }
         work->rho_inv_vec[i] = 1. / work->rho_vec[i];
     }
@@ -30,28 +25,20 @@ c_int update_rho_vec(OSQPWorkspace * work){
     c_int i, constr_type_changed = 0;
 
     for(i=0; i < work->data->m; i++){
-        if ( (work->data->l[i] < -OSQP_INFTY*MIN_SCALING) && (work->data->u[i] > OSQP_INFTY*MIN_SCALING) ) {
-            // Loose bounds
-            if (work->constr_type[i] != -1){
-                work->constr_type[i] = -1;
-                work->rho_vec[i] = RHO_MIN;
-                work->rho_inv_vec[i] = 1. / RHO_MIN;
-                constr_type_changed = 1;
-            }
-        } else if (work->data->u[i] - work->data->l[i] < RHO_TOL) {
+        if (work->data->u[i] - work->data->l[i] < RHO_TOL) {
             // Equality constraints
             if (work->constr_type[i] != 1){
                 work->constr_type[i] = 1;
-                work->rho_vec[i] = RHO_MAX;
-                work->rho_inv_vec[i] = 1. / RHO_MAX;
+                work->rho_vec[i] = work->settings->rho_eq;
+                work->rho_inv_vec[i] = 1. / work->settings->rho_eq;
                 constr_type_changed = 1;
             }
         } else {
             // Inequality constraints
             if (work->constr_type[i] != 0){
                 work->constr_type[i] = 0;
-                work->rho_vec[i] = work->settings->rho;
-                work->rho_inv_vec[i] = 1. / work->settings->rho;
+                work->rho_vec[i] = work->settings->rho_ineq;
+                work->rho_inv_vec[i] = 1. / work->settings->rho_ineq;
                 constr_type_changed = 1;
             }
         }
@@ -699,9 +686,15 @@ c_int validate_settings(const OSQPSettings * settings){
         return 1;
     }
 
-    if (settings->rho <= 0) {
+    if (settings->rho_eq <= 0) {
         #ifdef PRINTING
-        c_print("rho must be positive\n");
+        c_print("rho_eq must be positive\n");
+        #endif
+        return 1;
+    }
+    if (settings->rho_ineq <= 0) {
+        #ifdef PRINTING
+        c_print("rho_ineq must be positive\n");
         #endif
         return 1;
     }

@@ -187,27 +187,29 @@ static PyObject * OSQP_setup(OSQP *self, PyObject *args, PyObject *kwargs) {
                                  "Px", "Pi", "Pp", "q",           // Cost function
                                  "Ax", "Ai", "Ap", "l", "u",      // Constraints
                                  "scaling", "scaling_iter", "scaling_norm",
-                                 "rho", "sigma", "max_iter",
+                                 "rho_eq", "rho_ineq", "sigma", "max_iter",
                                  "eps_abs", "eps_rel", "eps_prim_inf", "eps_dual_inf", "alpha",
-								 "linsys_solver", "delta", "polish", "pol_refine_iter", "auto_rho", "verbose",
-                                 "scaled_termination", "early_terminate", "early_terminate_interval",
+																 "linsys_solver", "delta", "polish", "pol_refine_iter",
+																 "auto_rho", "verbose",
+                                 "scaled_termination", "early_terminate",
+																 "early_terminate_interval",
 								 "warm_start", NULL};  // Settings
 
 
         #ifdef DLONG
 
         #ifdef DFLOAT
-        static char * argparse_string = "(ll)O!O!O!O!O!O!O!O!O!|lllfflfffffflllllllll";
+        static char * argparse_string = "(ll)O!O!O!O!O!O!O!O!O!|lllffflfffffflllllllll";
         #else
-        static char * argparse_string = "(ll)O!O!O!O!O!O!O!O!O!|lllddlddddddlllllllll";
+        static char * argparse_string = "(ll)O!O!O!O!O!O!O!O!O!|llldddlddddddlllllllll";
         #endif
 
         #else
 
         #ifdef DFLOAT
-        static char * argparse_string = "(ii)O!O!O!O!O!O!O!O!O!|iiiffiffffffiiiiiiiii";
+        static char * argparse_string = "(ii)O!O!O!O!O!O!O!O!O!|iiifffiffffffiiiiiiiii";
         #else
-        static char * argparse_string = "(ii)O!O!O!O!O!O!O!O!O!|iiiddiddddddiiiiiiiii";
+        static char * argparse_string = "(ii)O!O!O!O!O!O!O!O!O!|iiidddiddddddiiiiiiiii";
         #endif
 
         #endif
@@ -232,7 +234,8 @@ static PyObject * OSQP_setup(OSQP *self, PyObject *args, PyObject *kwargs) {
                                          &settings->scaling,
                                          &settings->scaling_iter,
                                          &settings->scaling_norm,
-                                         &settings->rho,
+                                         &settings->rho_eq,
+																				 &settings->rho_ineq,
                                          &settings->sigma,
                                          &settings->max_iter,
                                          &settings->eps_abs,
@@ -240,15 +243,15 @@ static PyObject * OSQP_setup(OSQP *self, PyObject *args, PyObject *kwargs) {
                                          &settings->eps_prim_inf,
                                          &settings->eps_dual_inf,
                                          &settings->alpha,
-										 &settings->linsys_solver,
+																				 &settings->linsys_solver,
                                          &settings->delta,
                                          &settings->polish,
-					  			 	     &settings->pol_refine_iter,
-										 &settings->auto_rho,
+																				 &settings->pol_refine_iter,
+																				 &settings->auto_rho,
                                          &settings->verbose,
                                          &settings->scaled_termination,
                                          &settings->early_terminate,
-					 				 	 &settings->early_terminate_interval,
+																				 &settings->early_terminate_interval,
                                          &settings->warm_start)) {
                 return NULL;
         }
@@ -849,22 +852,22 @@ static PyObject *OSQP_update_eps_dual_inf(OSQP *self, PyObject *args){
 
 
 static PyObject *OSQP_update_rho(OSQP *self, PyObject *args){
-    c_float rho_new;
+    c_float rho_eq_new, rho_ineq_new;
 
 
     #ifdef DFLOAT
-    static char * argparse_string = "f";
+    static char * argparse_string = "ff";
     #else
-    static char * argparse_string = "d";
+    static char * argparse_string = "dd";
     #endif
 
     // Parse arguments
-    if( !PyArg_ParseTuple(args, argparse_string, &rho_new)) {
+    if( !PyArg_ParseTuple(args, argparse_string, &rho_eq_new, &rho_ineq_new)) {
         return NULL;
     }
 
     // Perform Update
-    osqp_update_rho(self->workspace, rho_new);
+    osqp_update_rho(self->workspace, rho_eq_new, rho_ineq_new);
 
     // Return None
     Py_INCREF(Py_None);

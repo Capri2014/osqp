@@ -16,7 +16,7 @@ osqp_settings = {'verbose': True,
                  'scaling_iter': 50,
                  'early_terminate_interval': 1,
                  'auto_rho': True,
-                 'rho': 0.1,
+                 'rho_ineq': 0.1,
                  'polish': False}
 
 # Solve with OSQP

@@ -34,7 +34,8 @@ enum linsys_solver_type {SUITESPARSE_LDL};
  * Solver Parameters and Settings *
  **********************************/
 
-#define RHO (0.1)
+#define RHO_EQ (1e6)
+#define RHO_INEQ (0.1)
 #define SIGMA (1E-06)
 #define MAX_ITER (2500)
 #define EPS_ABS (1E-3)

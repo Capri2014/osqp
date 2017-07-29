@@ -19,7 +19,7 @@ classdef primal_infeasibility_tests < matlab.unittest.TestCase
             % Setup solver options
             testCase.options = struct;
             testCase.options.verbose = 0;
-            testCase.options.rho = 0.01;
+            testCase.options.rho_ineq = 0.01;
             testCase.options.eps_prim_inf = 1e-05;
             testCase.options.max_iter = 2500;
             testCase.options.early_terminate_interval = 1;

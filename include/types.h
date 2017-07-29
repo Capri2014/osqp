@@ -132,9 +132,10 @@ typedef struct {
          * @name These *cannot* change for multiple runs with the same call to osqp_setup
          * @{
          */
-        c_float rho;     ///< ADMM step rho
-        c_float sigma;   ///< ADMM step sigma
-        c_int scaling;   ///< boolean, heuristic data rescaling
+        c_float rho_eq;     ///< ADMM step size for equality constraints
+        c_float rho_ineq;   ///< ADMM step size for inequality constraints
+        c_float sigma;      ///< ADMM step sigma
+        c_int scaling;      ///< boolean, heuristic data rescaling
 
         #if EMBEDDED != 1
         c_int scaling_iter; ///< scaling iteration
@@ -198,7 +199,7 @@ typedef struct {
         /** @} */
 
         #if EMBEDDED != 1
-        c_int *constr_type;   ///< Type of constraints: loose (-1), equality (1), inequality (0)
+        c_int *constr_type;   ///< Type of constraints: inequality (0), equality (1)
         #endif
 
         /**

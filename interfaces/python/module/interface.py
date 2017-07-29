@@ -201,7 +201,8 @@ class OSQP(object):
         Update OSQP solver settings
 
         It is possible to change: 'max_iter', 'eps_abs', 'eps_rel',
-                                  'eps_prim_inf', 'eps_dual_inf', 'rho'
+                                  'eps_prim_inf', 'eps_dual_inf',
+                                  'rho_eq', 'rho_ineq',
                                   'alpha', 'delta', 'polish',
                                   'pol_refine_iter',
                                   'verbose', 'scaled_termination',
@@ -215,7 +216,8 @@ class OSQP(object):
         eps_rel = kwargs.pop('eps_rel', None)
         eps_prim_inf = kwargs.pop('eps_prim_inf', None)
         eps_dual_inf = kwargs.pop('eps_dual_inf', None)
-        rho = kwargs.pop('rho', None)
+        rho_eq = kwargs.pop('rho_eq', None)
+        rho_ineq = kwargs.pop('rho_ineq', None)
         alpha = kwargs.pop('alpha', None)
         delta = kwargs.pop('delta', None)
         polish = kwargs.pop('polish', None)
@@ -242,8 +244,8 @@ class OSQP(object):
         if eps_dual_inf is not None:
             self._model.update_eps_dual_inf(eps_dual_inf)
 
-        if rho is not None:
-            self._model.update_rho(rho)
+        if rho_eq is not None and rho_ineq is not None:
+            self._model.update_rho(rho_eq, rho_ineq)
 
         if alpha is not None:
             self._model.update_alpha(alpha)
@@ -277,7 +279,8 @@ class OSQP(object):
            eps_rel is None and \
            eps_prim_inf is None and \
            eps_dual_inf is None and \
-           rho is None and \
+           rho_eq is None and \
+           rho_ineq is None and \
            alpha is None and \
            delta is None and \
            polish is None and \

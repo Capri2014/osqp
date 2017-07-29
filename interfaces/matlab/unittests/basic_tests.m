@@ -128,7 +128,7 @@ classdef basic_tests < matlab.unittest.TestCase
                 testCase.solver.constant('OSQP_MAX_ITER_REACHED'))
 
         end
-        
+
         function test_update_early_termination(testCase)
             % Update max_iter
             opts = testCase.solver.current_settings();
@@ -142,30 +142,32 @@ classdef basic_tests < matlab.unittest.TestCase
             testCase.verifyEqual(results.info.iter, testCase.options.max_iter, 'AbsTol',testCase.tol)
 
         end
-        
-        
+
+
         function test_update_rho(testCase)
-        
+
             % Solve with default rho
             res_default = testCase.solver.solve();
-            
+
             % Setup with different rho and update
             default_opts = testCase.options;
-            default_opts.rho = 0.7;
-            
+            default_opts.rho_eq = 0.7;
+
             testCase.solver = osqp;
             testCase.solver.setup(testCase.P, testCase.q, ...
                 testCase.A, testCase.l, testCase.u, default_opts);
-            testCase.solver.update_settings('rho', testCase.options.rho);
+            testCase.solver.update_settings( ...
+                'rho_eq', testCase.options.rho_eq, ...
+                'rho_ineq', testCase.options.rho_ineq);
             res_updated_rho = testCase.solver.solve();
-       
+
             % Verify same number of iterations
             testCase.verifyEqual(res_default.info.iter, ...
                                  res_updated_rho.info.iter)
-            
-            
-            
-            
+
+
+
+
         end
 
     end

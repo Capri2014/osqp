@@ -17,7 +17,7 @@ osqp_settings = {'verbose': True,
                  'early_terminate_interval': 1,
                  'auto_rho': True,
                  'alpha': 1.6,
-                 'rho': 0.01,
+                 'rho_ineq': 0.01,
                  'polish': False}
 
 

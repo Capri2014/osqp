@@ -20,7 +20,7 @@ classdef warm_start_tests < matlab.unittest.TestCase
             % Set options
             testCase.options = struct;
             testCase.options.verbose = 0;
-            testCase.options.rho = 0.01;
+            testCase.options.rho_ineq = 0.01;
             testCase.options.eps_abs = 1e-04;
             testCase.options.eps_rel = 1e-04;
             testCase.options.early_terminate_interval = 1;

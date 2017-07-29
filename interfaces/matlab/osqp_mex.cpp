@@ -29,7 +29,8 @@ const char* OSQP_INFO_FIELDS[] = {"iter",         //c_int
                                   "polish_time",    //c_float, only used if PROFILING
                                   "run_time"};      //c_float, only used if PROFILING
 
-const char* OSQP_SETTINGS_FIELDS[] = {"rho",                        //c_float
+const char* OSQP_SETTINGS_FIELDS[] = {"rho_eq",                     //c_float
+                                      "rho_ineq",                   //c_float
                                       //the following subset can't be changed after initilization
                                       "sigma",                      //c_float
                                       "scaling",                    //c_int
@@ -89,7 +90,7 @@ const char* OSQP_SCALING_FIELDS[] = {"D",       //c_float*
                                      "E",       //c_float*
                                      "Dinv",    //c_float*
                                      "Einv"};   //c_float*
-                                     
+
 const char* OSQP_RHO_VECTORS_FIELDS[] = {"rho_vec",         //c_float*
                                          "rho_inv_vec",     //c_float*
                                          "constr_type"};    //c_int*
@@ -714,7 +715,8 @@ mxArray* copySettingsToMxStruct(OSQPSettings* settings){
 
   //map the OSQP_SETTINGS fields one at a time into mxArrays
   //matlab handles everything as a double
-  mxSetField(mxPtr, 0, "rho",             mxCreateDoubleScalar(settings->rho));
+  mxSetField(mxPtr, 0, "rho_eq",          mxCreateDoubleScalar(settings->rho_eq));
+  mxSetField(mxPtr, 0, "rho_ineq",        mxCreateDoubleScalar(settings->rho_ineq));
   mxSetField(mxPtr, 0, "sigma",           mxCreateDoubleScalar(settings->sigma));
   mxSetField(mxPtr, 0, "scaling",         mxCreateDoubleScalar(settings->scaling));
   mxSetField(mxPtr, 0, "scaling_iter",    mxCreateDoubleScalar(settings->scaling_iter));
@@ -973,7 +975,8 @@ void copyMxStructToSettings(const mxArray* mxPtr, OSQPSettings* settings){
 
   //map the OSQP_SETTINGS fields one at a time into mxArrays
   //matlab handles everything as a double
-  settings->rho             = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "rho"));
+  settings->rho_eq          = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "rho_eq"));
+  settings->rho_ineq        = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "rho_ineq"));
   settings->sigma           = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "sigma"));
   settings->scaling         = (c_int)mxGetScalar(mxGetField(mxPtr, 0, "scaling"));
   settings->scaling_iter    = (c_int)mxGetScalar(mxGetField(mxPtr, 0, "scaling_iter"));
@@ -1035,11 +1038,13 @@ void copyUpdatedSettingsToWork(const mxArray* mxPtr ,OsqpData* osqpData){
 
 
   // Check for settings that need special update
-  // Update them only if they ae different than already set values
-  c_float rho_new = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "rho"));
-  // Check if it has changed
-  if (c_absval(rho_new - osqpData->work->settings->rho) > NEW_SETTINGS_TOL){
-      osqp_update_rho(osqpData->work, rho_new);
+  // Update them only if they are different than already set values
+  c_float rho_eq_new    = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "rho_eq"));
+  c_float rho_ineq_new = (c_float)mxGetScalar(mxGetField(mxPtr, 0, "rho_ineq"));
+  // Check if any of them has changed
+  if ( (c_absval(rho_eq_new - osqpData->work->settings->rho_eq) > NEW_SETTINGS_TOL) ||
+       (c_absval(rho_ineq_new - osqpData->work->settings->rho_ineq) > NEW_SETTINGS_TOL) ){
+      osqp_update_rho(osqpData->work, rho_eq_new, rho_ineq_new);
   }
 
 

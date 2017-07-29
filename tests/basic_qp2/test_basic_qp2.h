@@ -28,7 +28,7 @@ static char * test_basic_qp2_solve()
     set_default_settings(settings);
     settings->alpha = 1.6;
     settings->auto_rho = 0;
-    settings->rho = 0.1;
+    settings->rho_ineq = 0.1;
     settings->polish = 1;
     settings->verbose = 1;
 

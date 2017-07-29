@@ -180,7 +180,8 @@ class OSQP(object):
         max_iter = kwargs.pop('max_iter', None)
         eps_abs = kwargs.pop('eps_abs', None)
         eps_rel = kwargs.pop('eps_rel', None)
-        rho = kwargs.pop('rho', None)
+        rho_eq = kwargs.pop('rho_eq', None)
+        rho_ineq = kwargs.pop('rho_ineq', None)
         alpha = kwargs.pop('alpha', None)
         delta = kwargs.pop('delta', None)
         polish = kwargs.pop('polish', None)
@@ -201,8 +202,8 @@ class OSQP(object):
         if eps_rel is not None:
             self._model.update_eps_rel(eps_rel)
 
-        if rho is not None:
-            self._model.update_rho(rho)
+        if (rho_eq is not None) and (rho_ineq is not None):
+            self._model.update_rho(rho_eq, rho_ineq)
 
         if alpha is not None:
             self._model.update_alpha(alpha)
@@ -234,7 +235,8 @@ class OSQP(object):
         if max_iter is None and \
            eps_abs is None and \
            eps_rel is None and \
-           rho is None and \
+           rho_eq is None and \
+           rho_ineq is None and \
            alpha is None and \
            delta is None and \
            polish is None and \

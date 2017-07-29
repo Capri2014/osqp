@@ -52,9 +52,9 @@ norm_q = np.linalg.norm(q)
 # print("new P ")
 # print(P.todense())
 
-osqp_opts = {'rho': 0.001,
+osqp_opts = {'rho_ineq': 0.001,
              'auto_rho': True,
-             'scaling_iter': 15, 
+             'scaling_iter': 15,
              'polish': True,
              'early_terminate_interval': 1,
              'scaling': True}

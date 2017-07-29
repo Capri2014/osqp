@@ -24,7 +24,7 @@ class codegen_vectors_tests(unittest.TestCase):
         self.opts = {'verbose': False,
                      'eps_abs': 1e-06,
                      'eps_rel': 1e-06,
-                     'rho': 0.01,
+                     'rho_ineq': 0.01,
                      'alpha': 1.6,
                      'max_iter': 10000,
                      'warm_start': True}

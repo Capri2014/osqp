@@ -86,7 +86,7 @@ void print_setup_header(const OSQPData *data, const OSQPSettings *settings) {
 
     c_print("eps_abs = %.1e, eps_rel = %.1e,\n          ", settings->eps_abs, settings->eps_rel);
     c_print("eps_prim_inf = %.1e, eps_dual_inf = %.1e,\n          ", settings->eps_prim_inf, settings->eps_dual_inf);
-    c_print("rho = %.2e ", settings->rho);
+    c_print("rho_eq = %.2e, rho_ineq = %.2e ", settings->rho_eq, settings->rho_ineq);
     if (settings->auto_rho) c_print("(auto)");
     c_print("\n          ");
     c_print("sigma = %.1e, alpha = %.1e, \n          ", settings->sigma, settings->alpha);
@@ -202,8 +202,9 @@ void set_default_settings(OSQPSettings * settings) {
         settings->scaling_norm = SCALING_NORM;
         #endif
 
-        settings->rho = (c_float) RHO; /* ADMM step */
-        settings->sigma = (c_float) SIGMA; /* ADMM step */
+        settings->rho_eq = (c_float) RHO_EQ; /* ADMM step size parameter */
+        settings->rho_ineq = (c_float) RHO_INEQ; /* ADMM step size parameter */
+        settings->sigma = (c_float) SIGMA; /* ADMM step size parameter */
         settings->max_iter = MAX_ITER; /* maximum iterations to take */
         settings->eps_abs = (c_float) EPS_ABS;         /* absolute convergence tolerance */
         settings->eps_rel = (c_float) EPS_REL;         /* relative convergence tolerance */
@@ -237,7 +238,8 @@ OSQPSettings * copy_settings(OSQPSettings * settings){
     new->scaling = settings->scaling;
     new->scaling_iter = settings->scaling_iter;
     new->scaling_norm = settings->scaling_norm;
-    new->rho = settings->rho;
+    new->rho_eq = settings->rho_eq;
+    new->rho_ineq = settings->rho_ineq;
     new->sigma = settings->sigma;
     new->max_iter = settings->max_iter;
     new->eps_abs = settings->eps_abs;

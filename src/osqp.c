@@ -929,11 +929,11 @@ c_int osqp_update_P_A(OSQPWorkspace * work, c_float * Px_new, c_int * Px_new_idx
 }
 
 
-c_int osqp_update_rho(OSQPWorkspace * work, c_float rho_new){
+c_int osqp_update_rho(OSQPWorkspace * work, c_float rho_eq_new, c_float rho_ineq_new){
     c_int exitflag, i;
 
     // Check value of rho
-    if (rho_new <= 0) {
+    if (rho_eq_new <= 0 || rho_ineq_new <= 0) {
         #ifdef PRINTING
         c_print("rho must be positive\n");
         #endif
@@ -941,14 +941,17 @@ c_int osqp_update_rho(OSQPWorkspace * work, c_float rho_new){
     }
 
     // Update rho in settings
-    work->settings->rho = c_min(c_max(rho_new, RHO_MIN), RHO_MAX);
+    work->settings->rho_eq = rho_eq_new;
+    work->settings->rho_ineq = rho_ineq_new;
 
     // Update rho_vec and rho_inv_vec
     for (i = 0; i < work->data->m; i++){
-        if (work->constr_type[i] == 0) {
-            // Constraints for which rho is not set to RHO_MIN or RHO_MAX
-            work->rho_vec[i] = work->settings->rho;
-            work->rho_inv_vec[i] = 1. / work->settings->rho;
+        if (work->constr_type[i] == 1) {  // Equality constraints
+            work->rho_vec[i] = rho_eq_new;
+            work->rho_inv_vec[i] = 1. / rho_eq_new;
+        } else {  // Inequality constraints
+          work->rho_vec[i] = rho_ineq_new;
+          work->rho_inv_vec[i] = 1. / rho_ineq_new;
         }
     }
 

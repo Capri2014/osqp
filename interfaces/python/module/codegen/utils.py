@@ -83,7 +83,8 @@ def write_settings(f, settings, name, embedded_flag):
     """
     f.write("// Define settings structure\n")
     f.write("OSQPSettings %s = {" % name)
-    f.write("(c_float)%.20f, " % settings['rho'])
+    f.write("(c_float)%.20f, " % settings['rho_eq'])
+    f.write("(c_float)%.20f, " % settings['rho_ineq'])
     f.write("(c_float)%.20f, " % settings['sigma'])
     f.write("%d, " % settings['scaling'])
 

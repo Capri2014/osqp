@@ -194,7 +194,8 @@ class settings(object):
     scaling_norm [2]           - Equilibration scaling norm
 
     -> These can be changed without running setup
-    rho  [1.6]                 - Step in ADMM procedure
+    rho_eq [1e6]                        - Step size parameter in ADMM
+    rho_ineq [0.1]                      - Step size parameter in ADMM
     max_iter [5000]                     - Maximum number of iterations
     eps_abs  [1e-05]                    - Absolute tolerance
     eps_rel  [1e-05]                    - Relative tolerance
@@ -214,7 +215,8 @@ class settings(object):
 
     def __init__(self, **kwargs):
 
-        self.rho = kwargs.pop('rho', 0.1)
+        self.rho_eq = kwargs.pop('rho_eq', 1e6)
+        self.rho_ineq = kwargs.pop('rho_ineq', 0.1)
         self.sigma = kwargs.pop('sigma', 1e-06)
         self.scaling = kwargs.pop('scaling', True)
         self.scaling_iter = kwargs.pop('scaling_iter', 15)

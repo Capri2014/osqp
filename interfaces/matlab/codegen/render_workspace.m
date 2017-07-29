@@ -66,7 +66,8 @@ function write_settings( f, settings, embedded_flag )
 
 fprintf(f, '// Define settings structure\n');
 fprintf(f, 'OSQPSettings settings = {');
-fprintf(f, '(c_float)%.20f, ', settings.rho);
+fprintf(f, '(c_float)%.20f, ', settings.rho_eq);
+fprintf(f, '(c_float)%.20f, ', settings.rho_ineq);
 fprintf(f, '(c_float)%.20f, ', settings.sigma);
 fprintf(f, '%d, ',             settings.scaling);
 

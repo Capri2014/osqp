@@ -25,7 +25,8 @@ class basic_tests(unittest.TestCase):
                      'eps_rel': 1e-09,
                      'scaling': True,
                      'max_iter': 2500,
-                     'rho': 0.1,
+                     'rho_eq': 1e6,
+                     'rho_ineq': 0.1,
                      'polish': False,
                      'early_terminate_interval': 1,
                      'scaling_norm': -1,
@@ -116,11 +117,12 @@ class basic_tests(unittest.TestCase):
 
         # Setup with different rho and update
         default_opts = self.opts.copy()
-        default_opts['rho'] = 0.7
+        default_opts['rho_ineq'] = 0.7
         self.model = osqp.OSQP()
         self.model.setup(P=self.P, q=self.q, A=self.A, l=self.l, u=self.u,
                          **default_opts)
-        self.model.update_settings(rho=self.opts['rho'])
+        self.model.update_settings(rho_eq=self.opts['rho_eq'],
+                                   rho_ineq=self.opts['rho_ineq'])
         res_updated_rho = self.model.solve()
 
         # Assert same number of iterations

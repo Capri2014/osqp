@@ -30,7 +30,7 @@ from scripts.mpc.mpc_example import MPCExample
 
 # OSQP settings
 osqp_settings = {'auto_rho': False,
-                 'rho': 1000000.0,
+                 'rho_ineq': 1000000.0,
                  'polish': False,
                  'verbose': False}
 

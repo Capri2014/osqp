@@ -21,7 +21,7 @@ m = A.shape[0]
 #  u = None
 
 # OSQP options
-osqp_opts = {'rho': 1.0,
+osqp_opts = {'rho_ineq': 1.0,
              'auto_rho': True,
              'scaling_iter': 15,
              'scaling': True,
