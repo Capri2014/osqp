@@ -95,7 +95,10 @@ const char* OSQP_RHO_VECTORS_FIELDS[] = {"rho_vec",         //c_float*
                                          "rho_inv_vec",     //c_float*
                                          "constr_type"};    //c_int*
 
-const char* OSQP_WORKSPACE_FIELDS[] = {"rho_vectors",
+const char* OSQP_WORKSPACE_FIELDS[] = {"xiter",
+                                       "yiter",
+                                       "ziter",
+                                       "rho_vectors",
                                        "data",
                                        "linsys_solver",
                                        "scaling",
@@ -947,6 +950,17 @@ mxArray* copyWorkToMxStruct(OSQPWorkspace* work){
   int nfields  = sizeof(OSQP_WORKSPACE_FIELDS) / sizeof(OSQP_WORKSPACE_FIELDS[0]);
   mxArray* mxPtr = mxCreateStructMatrix(1,1,nfields,OSQP_WORKSPACE_FIELDS);
 
+  // Copy iterates data
+  mxArray* xiter    = mxCreateDoubleMatrix(work->data->n,1,mxREAL);
+  mxArray* yiter    = mxCreateDoubleMatrix(work->data->m,1,mxREAL);
+  mxArray* ziter    = mxCreateDoubleMatrix(work->data->m,1,mxREAL);
+  castToDoubleArr(work->x, mxGetPr(xiter), work->data->n);
+  castToDoubleArr(work->y, mxGetPr(yiter), work->data->m);
+  castToDoubleArr(work->z, mxGetPr(ziter), work->data->m);
+  mxSetField(mxPtr,0,"xiter",xiter);
+  mxSetField(mxPtr,0,"yiter",yiter);
+  mxSetField(mxPtr,0,"ziter",ziter);
+  
   // Create workspace substructures
   mxArray* rho_vectors   = copyRhoVectorsToMxStruct(work);
   mxArray* data          = copyDataToMxStruct(work);
