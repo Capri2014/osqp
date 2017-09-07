@@ -32,11 +32,11 @@ q = sp.randn(n)
 # q = q
 
 # Test
-rho = 0.1
+rho = 1.0
 # rho=10.0
 # q /= 100
-# P *= 100
-q *= 500
+# P *= 1000
+q *= 10000
 
 
 osqp_opts = {'rho': rho,

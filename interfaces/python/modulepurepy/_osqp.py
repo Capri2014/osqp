@@ -676,7 +676,7 @@ class OSQP(object):
                 self.work.z)
         self.work.y += self.work.delta_y
 
-    def compute_pri_res(self, x, z):
+    def compute_pri_res(self, x, z, unscale):
         """
         Compute primal residual ||Ax - z||
         """
@@ -684,8 +684,7 @@ class OSQP(object):
         # Primal residual
         pri_res = self.work.data.A.dot(x) - z
 
-        if self.work.settings.scaling and not \
-                self.work.settings.scaled_termination:
+        if unscale:
             pri_res = self.work.scaling.Einv.dot(pri_res)
 
         return la.norm(pri_res, np.inf)
@@ -710,7 +709,7 @@ class OSQP(object):
 
         return eps_pri
 
-    def compute_dua_res(self, x, y):
+    def compute_dua_res(self, x, y, unscale):
         """
         Compute dual residual ||Px + q + A'y||
         """
@@ -718,8 +717,7 @@ class OSQP(object):
         dua_res = self.work.data.P.dot(x) +\
             self.work.data.q + self.work.data.A.T.dot(y)
 
-        if self.work.settings.scaling and not \
-                self.work.settings.scaled_termination:
+        if unscale:
             # Use unscaled residual
             dua_res = self.work.scaling.Dinv.dot(dua_res)
 
@@ -851,20 +849,28 @@ class OSQP(object):
         Update information at iterations
         """
 
+        # Unscale info
+        unscale = self.work.settings.scaling and \
+            not self.work.settings.scaled_termination
+
         if polish == 1:
             self.work.pol.obj_val = self.work.data.objval(self.work.pol.x)
             self.work.pol.pri_res = self.compute_pri_res(self.work.pol.x,
-                                                         self.work.pol.z)
+                                                         self.work.pol.z,
+                                                         unscale)
             self.work.pol.dua_res = self.compute_dua_res(self.work.pol.x,
-                                                         self.work.pol.y)
+                                                         self.work.pol.y,
+                                                         unscale)
             self.work.info.polish_time = time.time() - self.work.timer
         else:
             self.work.info.iter = iter
             self.work.info.obj_val = self.work.data.objval(self.work.x)
             self.work.info.pri_res = self.compute_pri_res(self.work.x,
-                                                          self.work.z)
+                                                          self.work.z,
+                                                          unscale)
             self.work.info.dua_res = self.compute_dua_res(self.work.x,
-                                                          self.work.y)
+                                                          self.work.y,
+                                                          unscale)
             self.work.info.solve_time = time.time() - self.work.timer
 
     def print_summary(self):
@@ -1047,6 +1053,9 @@ class OSQP(object):
         self.work.x_prev = np.zeros(n)
         self.work.z_prev = np.zeros(m)
         self.work.y_prev = np.zeros(m)
+        self.work.x_prev_prev = np.zeros(n)
+        self.work.z_prev_prev = np.zeros(m)
+        self.work.y_prev_prev = np.zeros(m)
         self.work.y = np.zeros(m)
         self.work.delta_y = np.zeros(m)    # Delta_y for primal infeasibility
 
@@ -1097,9 +1106,20 @@ class OSQP(object):
         if not self.work.settings.warm_start:
             self.cold_start()
 
+        # Initialize variables for printing
+        # cos_vec = []
+        ratio_error = 0.0
+        ratio_error_int = 0.0
+        Kp = 0.01
+        Kd = 0.01
+        Ki = 0.01
+
         # ADMM algorithm
         for iter in range(1, self.work.settings.max_iter + 1):
             # Update x_prev, z_prev
+            self.work.x_prev_prev = np.copy(self.work.x_prev)
+            self.work.z_prev_prev = np.copy(self.work.z_prev)
+            self.work.y_prev_prev = np.copy(self.work.y_prev)
             self.work.x_prev = np.copy(self.work.x)
             self.work.z_prev = np.copy(self.work.z)
             self.work.y_prev = np.copy(self.work.y)
@@ -1129,15 +1149,68 @@ class OSQP(object):
                 if self.check_termination():
                     break
 
+                # Update rho
+                A = self.work.data.A
+                P = self.work.data.P
+                q = self.work.data.q
+                pri_res_normaliz = np.max([la.norm(A.dot(self.work.x), np.inf),
+                                           la.norm(self.work.z, np.inf)])
+                pri_res = self.compute_pri_res(self.work.x, self.work.z, 0) / \
+                    pri_res_normaliz
+
+                dua_res_normaliz = np.max([
+                    la.norm(A.T.dot(self.work.y), np.inf),
+                    la.norm(P.dot(self.work.x), np.inf),
+                    la.norm(q, np.inf)])
+                dua_res = self.compute_dua_res(self.work.x, self.work.z, 0) / \
+                    dua_res_normaliz
+                ratio_error_prev = ratio_error
+                ratio_error = pri_res / dua_res - 1
+                ratio_error_deriv = ratio_error - ratio_error_prev
+                ratio_error_int = ratio_error_int + ratio_error
+
+                # PID controller
+                rho_new = np.exp(Kp * ratio_error +
+                                 Ki * ratio_error_int +
+                                 Kd * ratio_error_deriv)
+
+                print(("rho = %.2e = (P) %.2e * %.2e + " +
+                       "(I) %.2e + %.2e + " +
+                       "(D) %.2e * %.2e") %
+                      (rho_new,
+                       Kp, ratio_error,
+                       Ki, ratio_error_int,
+                       Kd, ratio_error_deriv))
+
+                self.update_rho(rho_new)
+
                 # Perform line search
-                if iter % 100 == 0:
-                    self.work.x, self.work.z, self.work.y, = \
-                        self.line_search(self.work.x_prev,
-                                         self.work.z_prev,
-                                         self.work.y_prev,
-                                         self.work.x,
-                                         self.work.z,
-                                         self.work.y)
+                # q = np.concatenate((self.work.x, self.work.z, self.work.y))
+                # q_prev = np.concatenate((self.work.x_prev,
+                #                          self.work.z_prev,
+                #                          self.work.y_prev))
+                # q_prev_prev = np.concatenate((self.work.x_prev_prev,
+                #                               self.work.z_prev_prev,
+                #                               self.work.y_prev_prev))
+                # delta_q = q - q_prev
+                # delta_q_prev = q_prev - q_prev_prev
+                #
+                # eps = 1e-8
+                # if la.norm(delta_q) * la.norm(delta_q_prev) < eps:
+                #     cos_angle = 0.0
+                # else:
+                #     cos_angle = delta_q.dot(delta_q_prev) / \
+                #         (la.norm(delta_q) * la.norm(delta_q_prev))
+                # if cos_angle > 2:
+                #     self.work.x, self.work.z, self.work.y, = \
+                #         self.line_search(self.work.x_prev,
+                #                          self.work.z_prev,
+                #                          self.work.y_prev,
+                #                          self.work.x,
+                #                          self.work.z,
+                #                          self.work.y)
+                #
+                # cos_vec.append(cos_angle)
 
         if not self.work.settings.early_terminate:
             # Update info
@@ -1188,6 +1261,12 @@ class OSQP(object):
         # Eliminate first run flag
         if self.work.first_run:
             self.work.first_run = 0
+
+        # Plot cos angle
+        # import matplotlib.pylab as plt
+        # plt.figure(0)
+        # plt.plot(cos_vec)
+        # plt.show(block=False)
 
         # Store results structure
         return results(self.work.solution, self.work.info)
@@ -1684,7 +1763,7 @@ class OSQP(object):
 
             if continue_line_search:
                 # Decrease t
-                t *= 0.8
+                t *= 0.9
 
         if t < 1.0:
             if self.work.settings.verbose:
