@@ -136,14 +136,14 @@ class settings(object):
     max_iter [5000]                     - Maximum number of iterations
     eps_abs  [1e-05]                    - Absolute tolerance
     eps_rel  [1e-05]                    - Relative tolerance
-    eps_prim_inf  [1e-06]                    - Primal infeasibility tolerance
-    eps_dual_inf  [1e-06]                    - Dual infeasibility tolerance
+    eps_prim_inf  [1e-06]               - Primal infeasibility tolerance
+    eps_dual_inf  [1e-06]               - Dual infeasibility tolerance
     alpha [1.6]                         - Relaxation parameter
     delta [1.0]                         - Regularization parameter for polish
     verbose  [True]                     - Verbosity
-    scaled_termination [False]             - Evalute scaled termination criteria
+    scaled_termination [False]          - Evalute scaled termination criteria
     early_terminate  [True]             - Evalute termination criteria
-    early_terminate_interval  [25]      - Interval for evaluating termination criteria
+    early_terminate_interval  [25]      - Interval for checking termination
     warm_start [False]                  - Reuse solution from previous solve
     polish  [False]                     - Solution polish
     pol_refine_iter  [3]                - Iterative refinement iterations
@@ -192,25 +192,6 @@ class scaling(object):
         self.E = None
         self.Dinv = None
         self.Einv = None
-
-
-class linesearch(object):
-    """
-    Vectors obtained from line search between the ADMM and the polished
-    solution
-
-    Attributes
-    ----------
-    X     - matrix in R^{N \\times n}
-    Z     - matrix in R^{N \\times m}
-    Y     - matrix in R^{N \\times m}
-    t     - vector in R^N
-    """
-    def __init__(self):
-        self.X = None
-        self.Z = None
-        self.Y = None
-        self.t = None
 
 
 class solution(object):
@@ -309,11 +290,10 @@ class results(object):
     y           - dual solution
     info        - info structure
     """
-    def __init__(self, solution, info, linesearch):
+    def __init__(self, solution, info):
         self.x = solution.x
         self.y = solution.y
         self.info = info
-        self.linesearch = linesearch
 
 
 class OSQP(object):
@@ -1066,6 +1046,7 @@ class OSQP(object):
         self.work.xz_tilde = np.zeros(n + m)
         self.work.x_prev = np.zeros(n)
         self.work.z_prev = np.zeros(m)
+        self.work.y_prev = np.zeros(m)
         self.work.y = np.zeros(m)
         self.work.delta_y = np.zeros(m)    # Delta_y for primal infeasibility
 
@@ -1121,6 +1102,7 @@ class OSQP(object):
             # Update x_prev, z_prev
             self.work.x_prev = np.copy(self.work.x)
             self.work.z_prev = np.copy(self.work.z)
+            self.work.y_prev = np.copy(self.work.y)
 
             # Admm steps
             # First step: update \tilde{x} and \tilde{z}
@@ -1146,6 +1128,16 @@ class OSQP(object):
                 # Break if converged
                 if self.check_termination():
                     break
+
+                # Perform line search
+                if iter % 100 == 0:
+                    self.work.x, self.work.z, self.work.y, = \
+                        self.line_search(self.work.x_prev,
+                                         self.work.z_prev,
+                                         self.work.y_prev,
+                                         self.work.x,
+                                         self.work.z,
+                                         self.work.y)
 
         if not self.work.settings.early_terminate:
             # Update info
@@ -1176,9 +1168,7 @@ class OSQP(object):
         # Solution polish
         if self.work.settings.polish and \
                 self.work.info.status_val == OSQP_SOLVED:
-                    ls = self.polish()
-        else:
-            ls = None
+                    self.polish()
 
         # Update total times
         if self.work.first_run:
@@ -1200,7 +1190,7 @@ class OSQP(object):
             self.work.first_run = 0
 
         # Store results structure
-        return results(self.work.solution, self.work.info, ls)
+        return results(self.work.solution, self.work.info)
 
     #
     #   Auxiliary API Functions
@@ -1300,7 +1290,8 @@ class OSQP(object):
         Update quadratic cost matrix
         """
         if self.work.settings.scaling:
-            self.work.data.P = self.work.scaling.D.dot(P_new.dot(self.work.scaling.D))
+            self.work.data.P = self.work.scaling.D.dot(
+                P_new.dot(self.work.scaling.D))
         else:
             self.work.data.P = P_new
         self.work.linsys_solver = linsys_solver(self.work)
@@ -1310,7 +1301,8 @@ class OSQP(object):
         Update constraint matrix
         """
         if self.work.settings.scaling:
-            self.work.data.A = self.work.scaling.E.dot(A_new.dot(self.work.scaling.D))
+            self.work.data.A = self.work.scaling.E.dot(
+                A_new.dot(self.work.scaling.D))
         else:
             self.work.data.A = A_new
         self.work.linsys_solver = linsys_solver(self.work)
@@ -1320,8 +1312,10 @@ class OSQP(object):
         Update quadratic cost and constraint matrices
         """
         if self.work.settings.scaling:
-            self.work.data.P = self.work.scaling.D.dot(P_new.dot(self.work.scaling.D))
-            self.work.data.A = self.work.scaling.E.dot(A_new.dot(self.work.scaling.D))
+            self.work.data.P = self.work.scaling.D.dot(
+                P_new.dot(self.work.scaling.D))
+            self.work.data.A = self.work.scaling.E.dot(
+                A_new.dot(self.work.scaling.D))
         else:
             self.work.data.P = P_new
             self.work.data.A = A_new
@@ -1380,7 +1374,6 @@ class OSQP(object):
         # Cold start x and z
         self.work.x = np.zeros(self.work.data.n)
         self.work.z = np.zeros(self.work.data.m)
-
 
     #
     #   Update Problem Settings
@@ -1483,8 +1476,10 @@ class OSQP(object):
         """
         Update scaled_termination parameter
         """
-        if (scaled_termination_new is not True) & (scaled_termination_new is not False):
-            raise ValueError("scaled_termination should be either True or False")
+        if (scaled_termination_new is not True) & \
+                (scaled_termination_new is not False):
+            raise ValueError("scaled_termination should be " +
+                             "either True or False")
 
         self.work.settings.scaled_termination = scaled_termination_new
 
@@ -1492,7 +1487,8 @@ class OSQP(object):
         """
         Update early_terminate parameter
         """
-        if (early_terminate_new is not True) & (early_terminate_new is not False):
+        if (early_terminate_new is not True) & \
+                (early_terminate_new is not False):
             raise ValueError("early_terminate should be either True or False")
 
         self.work.settings.early_terminate = early_terminate_new
@@ -1501,10 +1497,13 @@ class OSQP(object):
         """
         Update early_terminate_interval parameter
         """
-        if (early_terminate_interval_new is not True) & (early_terminate_interval_new is not False):
-            raise ValueError("early_terminate_interval should be either True or False")
+        if (early_terminate_interval_new is not True) & \
+                (early_terminate_interval_new is not False):
+            raise ValueError("early_terminate_interval should be either " +
+                             "True or False")
 
-        self.work.settings.early_terminate_interval = early_terminate_interval_new
+        self.work.settings.early_terminate_interval = \
+            early_terminate_interval_new
 
     def update_warm_start(self, warm_start_new):
         """
@@ -1620,8 +1619,6 @@ class OSQP(object):
                       (self.work.pol.dua_res < self.work.info.dua_res) and \
                       (self.work.info.pri_res < 1e-10)
 
-        ls = linesearch()
-
         if pol_success:
             # Update solver information
             self.work.info.obj_val = self.work.pol.obj_val
@@ -1641,38 +1638,63 @@ class OSQP(object):
         else:
             self.work.info.status_polish = -1
 
-            # Line search on the line connecting the ADMM and the polished sol.
-            ls.t = np.linspace(0., 0.002, 1000)
-            ls.X, ls.Z, ls.Y = self.line_search(
-                            self.work.x, self.work.z, self.work.y,
-                            self.work.pol.x, self.work.pol.z, self.work.pol.y,
-                            ls.t)
-
-        return ls
-
-    def line_search(self, x1, z1, y1, x2, z2, y2, t):
+    def line_search(self, x1, z1, y1, x2, z2, y2):
         """
         Perform line search on the line between (x1,z1,y1) and (x2,z2,y2).
         """
-        N = len(t)
-        X = np.zeros((N, self.work.data.n))
-        Z = np.zeros((N, self.work.data.m))
-        Y = np.zeros((N, self.work.data.m))
 
+        # Current residuals
+        pri_res = self.work.info.pri_res
+        dua_res = self.work.info.dua_res
+
+        # Compute deltas
         dx = x2 - x1
-        dz = z2 - z1
         dy = y2 - y1
+        dz = z2 - z1
 
-        for i in range(N):
-            X[i, :] = x1 + t[i] * dx
-            Z[i, :] = z1 + t[i] * dz
-            Y[i, :] = y1 + t[i] * dy
-            Z[i, :], Y[i, :] = self.project_normalcone(Z[i, :], Y[i, :])
+        # Define new points
+        x_new = np.zeros(self.work.data.n)
+        z_new = np.zeros(self.work.data.m)
+        y_new = np.zeros(self.work.data.m)
 
-            # Unscale optimization variables (x,z,y)
-            if self.work.settings.scaling:
-                X[i, :] = self.work.scaling.D.dot(X[i, :])
-                Z[i, :] = self.work.scaling.Einv.dot(Z[i, :])
-                Y[i, :] = self.work.scaling.E.dot(Y[i, :])
+        # Initialize t and new residuals
+        t = 1000
+        new_pri_res = OSQP_INFTY
+        new_dua_res = OSQP_INFTY
 
-        return (X, Z, Y)
+        # Perform line search
+        continue_line_search = True
+        while continue_line_search:
+
+            # Compute new point
+            x_new = x1 + t * dx
+            z_new = z1 + t * dz
+            y_new = y1 + t * dy
+
+            # Project new point
+            z_new, y_new = self.project_normalcone(z_new, y_new)
+
+            # Compute residuals
+            new_pri_res = self.compute_pri_res(x_new, z_new)
+            new_dua_res = self.compute_dua_res(x_new, y_new)
+
+            continue_line_search = \
+                ((new_pri_res > pri_res) or
+                 (new_dua_res > dua_res)) and (t > 1.0)
+
+            if continue_line_search:
+                # Decrease t
+                t *= 0.8
+
+        if t < 1.0:
+            if self.work.settings.verbose:
+                print("LS: Failed to find better points")
+            return x2, z2, y2
+        else:
+            if self.work.settings.verbose:
+                # Print details
+                print(("LS: Success! (new_pri_res/pri_res) = (%.2e/%.2e),\t " +
+                      "(new_dua_res/dua_res) = (%.2e/%.2e)\t t=%2.2f") %
+                      (new_pri_res, pri_res, new_dua_res, dua_res, t))
+
+            return x_new, z_new, y_new
