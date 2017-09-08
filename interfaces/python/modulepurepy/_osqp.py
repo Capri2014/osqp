@@ -1108,11 +1108,11 @@ class OSQP(object):
 
         # Initialize variables for printing
         # cos_vec = []
-        ratio_error = 0.0
-        ratio_error_int = 0.0
-        Kp = 0.01
-        Kd = 0.01
-        Ki = 0.01
+        ratio_res = 1.0
+        ratio_res_int = 0.0
+        Kp = 1.0
+        Kd = 0.0
+        Ki = 1.0
 
         # ADMM algorithm
         for iter in range(1, self.work.settings.max_iter + 1):
@@ -1164,23 +1164,23 @@ class OSQP(object):
                     la.norm(q, np.inf)])
                 dua_res = self.compute_dua_res(self.work.x, self.work.z, 0) / \
                     dua_res_normaliz
-                ratio_error_prev = ratio_error
-                ratio_error = pri_res / dua_res - 1
-                ratio_error_deriv = ratio_error - ratio_error_prev
-                ratio_error_int = ratio_error_int + ratio_error
+                ratio_res_prev = np.copy(ratio_res)
+                ratio_res = pri_res / dua_res
+                ratio_res_deriv = ratio_res - ratio_res_prev
+                ratio_res_int = ratio_res_int + ratio_res
 
                 # PID controller
-                rho_new = np.exp(Kp * ratio_error +
-                                 Ki * ratio_error_int +
-                                 Kd * ratio_error_deriv)
+                rho_new = np.maximum(Kp * ratio_res +
+                                     Ki * ratio_res_int +
+                                     Kd * ratio_res_deriv, 1e-06)
 
                 print(("rho = %.2e = (P) %.2e * %.2e + " +
                        "(I) %.2e + %.2e + " +
                        "(D) %.2e * %.2e") %
                       (rho_new,
-                       Kp, ratio_error,
-                       Ki, ratio_error_int,
-                       Kd, ratio_error_deriv))
+                       Kp, ratio_res,
+                       Ki, ratio_res_int,
+                       Kd, ratio_res_deriv))
 
                 self.update_rho(rho_new)
 

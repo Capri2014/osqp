@@ -4,10 +4,15 @@ import scipy.sparse as sparse
 import scipy as sp
 import numpy as np
 import mathprogbasepy as mpbpy
-sp.random.seed(2)
+sp.random.seed(3)
 
 n = 20
 m = 30
+
+
+random_scale_n = sparse.diags(np.power(10, 2 * np.random.randn(n)))
+random_scale_m = sparse.diags(np.power(10, 2 * np.random.randn(m)))
+
 A = sparse.random(m, n, density=0.9,
                   data_rvs=np.random.randn,
                   format='csc')
@@ -36,7 +41,19 @@ rho = 1.0
 # rho=10.0
 # q /= 100
 # P *= 1000
-q *= 10000
+# q *= 10000
+
+
+# Scale problem
+random_scale_n = sparse.diags(np.power(10, 2 * np.random.randn(n)))
+random_scale_m = sparse.diags(np.power(10, 2 * np.random.randn(m)))
+P = random_scale_n.dot(P).dot(random_scale_n).tocsc()
+q = random_scale_n.dot(q)
+A = random_scale_m.dot(A).tocsc()
+l = random_scale_m.dot(l)
+u = random_scale_m.dot(u)
+
+
 
 
 osqp_opts = {'rho': rho,
