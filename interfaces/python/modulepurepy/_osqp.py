@@ -1108,6 +1108,7 @@ class OSQP(object):
 
         # Initialize variables for printing
         # cos_vec = []
+        rho_new = self.work.settings.rho
         ratio_error = 0.0
         ratio_error_int = 0.0
         Kp = 0.01
@@ -1169,20 +1170,26 @@ class OSQP(object):
                 ratio_error_deriv = ratio_error - ratio_error_prev
                 ratio_error_int = ratio_error_int + ratio_error
 
+                # Update rule
+                if iter % 100 == 0:
+                    rho_new *= np.sqrt(pri_res / dua_res)
+                    rho_new = np.minimum(np.maximum(rho_new, 1e-06), 1e06)
+                    print("rho = %.2e | pri_res = %.2e, dua_res = %.2e" %
+                          (rho_new, pri_res, dua_res))
+                    self.update_rho(rho_new)
+
                 # PID controller
-                rho_new = np.exp(Kp * ratio_error +
-                                 Ki * ratio_error_int +
-                                 Kd * ratio_error_deriv)
-
-                print(("rho = %.2e = (P) %.2e * %.2e + " +
-                       "(I) %.2e + %.2e + " +
-                       "(D) %.2e * %.2e") %
-                      (rho_new,
-                       Kp, ratio_error,
-                       Ki, ratio_error_int,
-                       Kd, ratio_error_deriv))
-
-                self.update_rho(rho_new)
+                # rho_new = np.exp(Kp * ratio_error +
+                #                  Ki * ratio_error_int +
+                #                  Kd * ratio_error_deriv)
+                # print(("rho = %.2e = (P) %.2e * %.2e + " +
+                #        "(I) %.2e + %.2e + " +
+                #        "(D) %.2e * %.2e") %
+                #       (rho_new,
+                #        Kp, ratio_error,
+                #        Ki, ratio_error_int,
+                #        Kd, ratio_error_deriv))
+                # self.update_rho(rho_new)
 
                 # Perform line search
                 # q = np.concatenate((self.work.x, self.work.z, self.work.y))
