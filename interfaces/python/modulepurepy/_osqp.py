@@ -1109,6 +1109,7 @@ class OSQP(object):
         # Initialize variables for printing
         # cos_vec = []
         rho_new = self.work.settings.rho
+        res_ratio_vec = []
         ratio_error = 0.0
         ratio_error_int = 0.0
         Kp = 0.01
@@ -1166,17 +1167,19 @@ class OSQP(object):
                 dua_res = self.compute_dua_res(self.work.x, self.work.z, 0) / \
                     dua_res_normaliz
                 ratio_error_prev = ratio_error
-                ratio_error = pri_res / dua_res - 1
-                ratio_error_deriv = ratio_error - ratio_error_prev
-                ratio_error_int = ratio_error_int + ratio_error
+                res_ratio = pri_res / dua_res
+                res_ratio_vec.append(res_ratio)
+                # ratio_error = ratio_res - 1
+                # ratio_error_deriv = ratio_error - ratio_error_prev
+                # ratio_error_int = ratio_error_int + ratio_error
 
                 # Update rule
-                if iter % 100 == 0:
-                    rho_new *= np.sqrt(pri_res / dua_res)
-                    rho_new = np.minimum(np.maximum(rho_new, 1e-06), 1e06)
-                    print("rho = %.2e | pri_res = %.2e, dua_res = %.2e" %
-                          (rho_new, pri_res, dua_res))
-                    self.update_rho(rho_new)
+                # if iter % 100 == 0:
+                #     rho_new *= np.sqrt(pri_res / dua_res)
+                #     rho_new = np.minimum(np.maximum(rho_new, 1e-06), 1e06)
+                #     print("rho = %.2e | pri_res = %.2e, dua_res = %.2e" %
+                #           (rho_new, pri_res, dua_res))
+                #     self.update_rho(rho_new)
 
                 # PID controller
                 # rho_new = np.exp(Kp * ratio_error +
@@ -1274,6 +1277,12 @@ class OSQP(object):
         # plt.figure(0)
         # plt.plot(cos_vec)
         # plt.show(block=False)
+
+        # Plot residual ratio
+        import matplotlib.pylab as plt
+        plt.figure(0)
+        plt.semilogy(res_ratio_vec)
+        plt.show(block=False)
 
         # Store results structure
         return results(self.work.solution, self.work.info)
