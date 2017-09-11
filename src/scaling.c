@@ -181,29 +181,67 @@ c_int scale_data(OSQPWorkspace * work){
 		vec_ew_prod(work->scaling->D, work->D_temp, work->scaling->D, n);
 		vec_ew_prod(work->scaling->E, work->E_temp, work->scaling->E, m);
 
+		// //
+		// // Cost normalization step
+		// //
 		//
-		// Cost normalization step
+		// // Compute avg norm of cols of P
+		// mat_inf_norm_cols_sym_triu(work->data->P, work->D_temp);
+		// c_temp = vec_mean(work->D_temp, n);
 		//
+		// // DEBUG
+		// // c_print("avg_norm_P_cols = %.2e\n", c_temp);
+		//
+		// // Compute inf norm of q
+		// inf_norm_q = vec_norm_inf(work->data->q, n);
+		//
+		// // DEBUG
+		// // c_print("inf_norm_q = %.2e\n", inf_norm_q);
+		//
+		// // Compute max between avg norm of cols of P and inf norm of q
+		// c_temp = c_max(c_temp, inf_norm_q);
+		//
+		// // DEBUG: Force one scaling (TODO REMOVE ME)
+		// // c_temp = 1.0;
+		//
+		// // Limit scaling (use same function as with vectors)
+		// limit_scaling(&c_temp, 1);
+		// // Invert scaling c = 1 / cost_measure
+		// c_temp = 1./c_temp;
+		// // Scale P
+		// mat_mult_scalar(work->data->P, c_temp);
+		// // Scale q
+		// vec_mult_scalar(work->data->q, c_temp, n);
+		// // Update cost scaling
+		// work->scaling->c *= c_temp;
+		//
+		// // DEBUG
+		// // c_print("Scale cost = %.2e\n", c_temp);
 
-		// Compute avg norm of cols of P
-		mat_inf_norm_cols_sym_triu(work->data->P, work->D_temp);
-		c_temp = vec_mean(work->D_temp, n);
 
-		// DEBUG
-		// c_print("avg_norm_P_cols = %.2e\n", c_temp);
+	}
 
-		// Compute inf norm of q
-		inf_norm_q = vec_norm_inf(work->data->q, n);
 
-		// DEBUG
-		// c_print("inf_norm_q = %.2e\n", inf_norm_q);
+	//
+	// Cost normalization step (only at the end)
+	//
 
+	// Compute avg norm of cols of P
+	mat_inf_norm_cols_sym_triu(work->data->P, work->D_temp);
+	c_temp = vec_mean(work->D_temp, n);
+
+	// DEBUG
+	// c_print("avg_norm_P_cols = %.2e\n", c_temp);
+
+	// Compute inf norm of q
+	inf_norm_q = vec_norm_inf(work->data->q, n);
+
+	// DEBUG
+	// c_print("inf_norm_q = %.2e\n", inf_norm_q);
+
+	if (inf_norm_q > RHO_TOL) {
 		// Compute max between avg norm of cols of P and inf norm of q
 		c_temp = c_max(c_temp, inf_norm_q);
-
-		// DEBUG: Force one scaling (TODO REMOVE ME)
-		// c_temp = 1.0;
-
 		// Limit scaling (use same function as with vectors)
 		limit_scaling(&c_temp, 1);
 		// Invert scaling c = 1 / cost_measure
@@ -215,11 +253,14 @@ c_int scale_data(OSQPWorkspace * work){
 		// Update cost scaling
 		work->scaling->c *= c_temp;
 
-		// DEBUG
-		// c_print("Scale cost = %.2e\n", c_temp);
-
-
 	}
+	// DEBUG: Force one scaling (TODO REMOVE ME)
+	// c_temp = 1.0;
+	// c_print("Final cost scaling = %.10f\n", work->scaling->c);
+
+
+
+
 
 
 	// Store cinv, Dinv, Einv
@@ -234,14 +275,14 @@ c_int scale_data(OSQPWorkspace * work){
 
 
 	// DEBUG
-	// #ifdef PRINTING
-	// c_print("Final cost scaling = %.10f\n", work->scaling->c);
+	#ifdef PRINTING
+	c_print("Final cost scaling = %.10f\n", work->scaling->c);
 	// c_print("n = %i\n", n);
 	// print_vec(work->scaling->D, n, "D");
 	// print_vec(work->scaling->Dinv, n, "Dinv");
 	// print_vec(work->scaling->E, m, "E");
 	// print_vec(work->scaling->Einv, m, "Einv");
-	// #endif
+	#endif
 
     return 0;
 }

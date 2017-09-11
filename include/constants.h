@@ -50,6 +50,12 @@ enum linsys_solver_type {SUITESPARSE_LDL};
 #define RHO_MAX (1e06)
 #define RHO_TOL (1e-04)
 
+// Test custom rho function
+#define RHO_0 (1e06)
+#define RHO_INF (0.1)
+#define BETA_RHO (1e5)
+
+
 
 #ifndef EMBEDDED
 #define DELTA (1E-6)

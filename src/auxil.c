@@ -4,26 +4,69 @@
  * Auxiliary functions needed to compute ADMM iterations * *
  ***********************************************************/
 #if EMBEDDED != 1
+
+/**
+ * Compute single element of rho vector
+ * @param  l_i lower bound of i-th constraint
+ * @param  u_i upper bound of i-th constraint
+ * @return     rho_i
+ */
+c_float compute_rho_i(c_float l_i, c_float u_i){
+    c_float m;
+    m = u_i - l_i;
+    return (RHO_0 + RHO_INF * BETA_RHO * m) / (1 + BETA_RHO * m);
+}
+
 void set_rho_vec(OSQPWorkspace * work){
     c_int i;
-    work->settings->rho = c_min(c_max(work->settings->rho, RHO_MIN), RHO_MAX);
+    c_float * l, *u;
 
+    l = work->data->l;
+    u = work->data->u;
+
+    // new stuff
+    for (i = 0; i < work->data->m; i++){
+        work->rho_vec[i] = compute_rho_i(l[i], u[i]);
+        // work->rho_vec[i] = work->settings->rho;
+        work->rho_inv_vec[i] = 1. / work->rho_vec[i];
+    }
+
+    // DEBUG
+    // print_vec(work->rho_vec, work->data->m, "rho_vec");
+
+    // Set constr_type to be compatible with previous rho updates
     for(i=0; i < work->data->m; i++){
         if ( (work->data->l[i] < -OSQP_INFTY*MIN_SCALING) && (work->data->u[i] > OSQP_INFTY*MIN_SCALING) ) {
             // Loose bounds
             work->constr_type[i] = -1;
-            work->rho_vec[i] = RHO_MIN;
         } else if (work->data->u[i] - work->data->l[i] < RHO_TOL) {
             // Equality constraints
             work->constr_type[i] = 1;
-            work->rho_vec[i] = RHO_MAX;
         } else {
             // Inequality constraints
             work->constr_type[i] = 0;
-            work->rho_vec[i] = work->settings->rho;
         }
-        work->rho_inv_vec[i] = 1. / work->rho_vec[i];
     }
+
+    // old stuff
+    // work->settings->rho = c_min(c_max(work->settings->rho, RHO_MIN), RHO_MAX);
+    //
+    // for(i=0; i < work->data->m; i++){
+    //     if ( (work->data->l[i] < -OSQP_INFTY*MIN_SCALING) && (work->data->u[i] > OSQP_INFTY*MIN_SCALING) ) {
+    //         // Loose bounds
+    //         work->constr_type[i] = -1;
+    //         work->rho_vec[i] = RHO_MIN;
+    //     } else if (work->data->u[i] - work->data->l[i] < RHO_TOL) {
+    //         // Equality constraints
+    //         work->constr_type[i] = 1;
+    //         work->rho_vec[i] = RHO_MAX;
+    //     } else {
+    //         // Inequality constraints
+    //         work->constr_type[i] = 0;
+    //         work->rho_vec[i] = work->settings->rho;
+    //     }
+    //     work->rho_inv_vec[i] = 1. / work->rho_vec[i];
+    // }
 }
 
 c_int update_rho_vec(OSQPWorkspace * work){
