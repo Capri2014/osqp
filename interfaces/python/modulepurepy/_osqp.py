@@ -400,6 +400,8 @@ class OSQP(object):
         # Initialize scaling
         s_temp = np.ones(n + m)
         c = 1.0  # Cost scaling
+        c_temp = 1.0
+        c_temp_prev = c_temp
 
         # Define reduced KKT matrix to scale
         # KKT = spspa.vstack([
@@ -449,31 +451,77 @@ class OSQP(object):
             D = D_temp.dot(D)
             E = E_temp.dot(E)
 
-            # Second Step cost normalization
-            avg_norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
-            inf_norm_q = np.linalg.norm(q, np.inf)
-            scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
-            scale_cost = 1. / np.maximum(np.minimum(
-                scale_cost, MAX_SCALING), MIN_SCALING)
-
+            # # Second Step cost normalization
+            # avg_norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
+            # inf_norm_q = np.linalg.norm(q, np.inf)
+            # # scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
+            # scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
+            # scale_cost = 1. / np.maximum(np.minimum(
+            #     scale_cost, MAX_SCALING), MIN_SCALING)
+            #
             # print("avg_norm_P_cols", avg_norm_P_cols)
             # print("inf_norm_q", inf_norm_q)
-            # print("Scale cost = %.2e" % scale_cost)
+            # print("Temp scale cost = %.2e" % scale_cost)
+            #
+            # # norm_cost = self._limit_scaling(norm_cost)
+            # # c_temp_prev = c_temp
+            # c_temp = scale_cost
+            #
+            # # Debug: avoid scaling!
+            # # c_temp = 1.0
+            #
+            # # Normalize cost
+            # # P = c_temp * P
+            # # q = c_temp * q
+            #
+            # # Update scaling
+            # c = c_temp * c
+            #
+            # print("Total scale cost = %.2e" % c)
 
-            # norm_cost = self._limit_scaling(norm_cost)
-            c_temp = scale_cost
+            # if (abs(c_temp - c_temp_prev) < 1e-03):
+            #     # Stop loop if it converges
+            #     break
 
-            # c_temp = 1.0
+        # Independent cost normalization
+        avg_norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
+        inf_norm_q = np.linalg.norm(q, np.inf)
+        scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
 
-            # Normalize cost
-            P = c_temp * P
-            q = c_temp * q
+        scale_cost = inf_norm_q if inf_norm_q > 1e-06 else 1
 
-            # Update scaling
-            c = c_temp * c
+        scale_cost = 1. / np.maximum(np.minimum(
+            scale_cost, MAX_SCALING), MIN_SCALING)
 
-        if self.work.settings.verbose:
-            print("Final cost scaling = %.10f" % c)
+        # print("avg_norm_P_cols", avg_norm_P_cols)
+        print("inf_norm_q", inf_norm_q)
+        # print("Temp scale cost = %.2e" % scale_cost)
+
+        # Cost scaling
+        c = scale_cost
+
+        # Normalize cost
+        P = c * P
+        q = c * q
+
+        print("Total scale cost = %.2e" % c)
+
+        # DEBUG: check distance l and u
+        # test_lu = u - l
+        # test_lu = test_lu[test_lu != 0]
+        # import ipdb; ipdb.set_trace()
+
+        # DEBUG set  scaling manually
+        # c = 1. / sum(l != u)
+        # P = c * P
+        # q = c * q
+
+        # import ipdb; ipdb.set_trace()
+
+        # if self.work.settings.verbose:
+        #     print("Final cost scaling = %.10f" % c)
+
+
 
         # import ipdb; ipdb.set_trace()
 
