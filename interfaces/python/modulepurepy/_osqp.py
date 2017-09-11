@@ -401,7 +401,9 @@ class OSQP(object):
         s_temp = np.ones(n + m)
         c = 1.0  # Cost scaling
         c_temp = 1.0
-        c_temp_prev = c_temp
+        # c_temp_prev = c_temp
+        # avg_norm_P_cols = 1.0
+        # avg_norm_P_cols_prev = 1.0
 
         # Define reduced KKT matrix to scale
         # KKT = spspa.vstack([
@@ -451,13 +453,15 @@ class OSQP(object):
             D = D_temp.dot(D)
             E = E_temp.dot(E)
 
-            # # Second Step cost normalization
+            # Second Step cost normalization
             # avg_norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
             # inf_norm_q = np.linalg.norm(q, np.inf)
-            # # scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
-            # scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
-            # scale_cost = 1. / np.maximum(np.minimum(
-            #     scale_cost, MAX_SCALING), MIN_SCALING)
+            # if inf_norm_q > 1e-06:
+            #     scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
+            #     scale_cost = 1. / np.maximum(np.minimum(
+            #         scale_cost, MAX_SCALING), MIN_SCALING)
+            # else:
+            #     scale_cost = 1.0
             #
             # print("avg_norm_P_cols", avg_norm_P_cols)
             # print("inf_norm_q", inf_norm_q)
@@ -471,24 +475,28 @@ class OSQP(object):
             # # c_temp = 1.0
             #
             # # Normalize cost
-            # # P = c_temp * P
-            # # q = c_temp * q
+            # P = c_temp * P
+            # q = c_temp * q
             #
             # # Update scaling
             # c = c_temp * c
             #
             # print("Total scale cost = %.2e" % c)
 
-            # if (abs(c_temp - c_temp_prev) < 1e-03):
+            # if (abs(avg_norm_P_cols_prev - avg_norm_P_cols) < 1e-03):
             #     # Stop loop if it converges
             #     break
 
         # Independent cost normalization
         avg_norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
         inf_norm_q = np.linalg.norm(q, np.inf)
-        scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
+        if inf_norm_q > 1e-06:
+            scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
+        else:
+            scale_cost = 1.0
+        # scale_cost = inf_norm_q + avg_norm_P_cols / 2
 
-        scale_cost = inf_norm_q if inf_norm_q > 1e-06 else 1
+        # scale_cost = inf_norm_q if inf_norm_q > 1e-06 else 1
 
         scale_cost = 1. / np.maximum(np.minimum(
             scale_cost, MAX_SCALING), MIN_SCALING)
@@ -503,8 +511,8 @@ class OSQP(object):
         # Normalize cost
         P = c * P
         q = c * q
-
-        print("Total scale cost = %.2e" % c)
+        #
+        # print("Total scale cost = %.2e" % c)
 
         # DEBUG: check distance l and u
         # test_lu = u - l
@@ -543,67 +551,92 @@ class OSQP(object):
         self.work.scaling.c = c
         self.work.scaling.cinv = 1. / c
 
+    def rho_i(self, l_i, u_i):
+        """
+        Compute rho_i from l_i, u_i
+        """
+        RHO_0 = 1e6
+        RHO_INF = 1e-1
+        BETA_RHO = 1e7
+
+        m = u_i - l_i
+
+        rho_i = (RHO_0 + RHO_INF * BETA_RHO * m) / (1 + BETA_RHO * m)
+
+        return rho_i
+
     def set_rho_vec(self):
         """
         Set values of rho vector based on constraint types
         """
-        self.work.settings.rho = np.minimum(np.maximum(self.work.settings.rho,
-                                            RHO_MIN), RHO_MAX)
+        # New stuff
+        l = self.work.data.l
+        u = self.work.data.u
 
-        # Find indices of loose bounds, equality constr and one-sided constr
-        loose_ind = np.where(np.logical_and(
-                            self.work.data.l < -OSQP_INFTY*MIN_SCALING,
-                            self.work.data.u > OSQP_INFTY*MAX_SCALING))[0]
-        eq_ind = np.where(self.work.data.u - self.work.data.l < RHO_TOL)[0]
-        ineq_ind = np.setdiff1d(np.setdiff1d(np.arange(self.work.data.m),
-                                loose_ind), eq_ind)
-
-        # Type of constraints
-        self.work.constr_type[loose_ind] = -1
-        self.work.constr_type[eq_ind] = 1
-        self.work.constr_type[ineq_ind] = 0
-
-        self.work.rho_vec[loose_ind] = RHO_MIN
-        self.work.rho_vec[eq_ind] = RHO_MAX
-        self.work.rho_vec[ineq_ind] = self.work.settings.rho
+        # Set rho based on smooth rule depending on slacks
+        for i in range(self.work.data.m):
+                self.work.rho_vec[i] = self.rho_i(l[i], u[i])
 
         self.work.rho_inv_vec = np.reciprocal(self.work.rho_vec)
 
-    def update_rho_vec(self):
-        """
-        Update values of rho_vec and return 1 if type of some constraints
-        changed.
-        """
-        # Find indices of loose bounds, equality constr and one-sided constr
-        loose_ind = np.where(np.logical_and(
-                            self.work.data.l < -OSQP_INFTY*MIN_SCALING,
-                            self.work.data.u > OSQP_INFTY*MAX_SCALING))[0]
-        eq_ind = np.where(self.work.data.u - self.work.data.l < RHO_TOL)[0]
-        ineq_ind = np.setdiff1d(np.setdiff1d(np.arange(self.work.data.m),
-                                loose_ind), eq_ind)
 
-        # Find indices of current constraint types
-        old_loose_ind = np.where(self.work.constr_type == -1)
-        old_eq_ind = np.where(self.work.constr_type == 1)
-        old_ineq_ind = np.where(self.work.constr_type == 0)
+        # self.work.settings.rho = np.minimum(np.maximum(self.work.settings.rho,
+        #                                     RHO_MIN), RHO_MAX)
+        #
+        # # Find indices of loose bounds, equality constr and one-sided constr
+        # loose_ind = np.where(np.logical_and(
+        #                     self.work.data.l < -OSQP_INFTY*MIN_SCALING,
+        #                     self.work.data.u > OSQP_INFTY*MAX_SCALING))[0]
+        # eq_ind = np.where(self.work.data.u - self.work.data.l < RHO_TOL)[0]
+        # ineq_ind = np.setdiff1d(np.setdiff1d(np.arange(self.work.data.m),
+        #                         loose_ind), eq_ind)
+        #
+        # # Type of constraints
+        # self.work.constr_type[loose_ind] = -1
+        # self.work.constr_type[eq_ind] = 1
+        # self.work.constr_type[ineq_ind] = 0
+        #
+        # self.work.rho_vec[loose_ind] = RHO_MIN
+        # self.work.rho_vec[eq_ind] = RHO_MAX
+        # self.work.rho_vec[ineq_ind] = self.work.settings.rho
+        #
+        # self.work.rho_inv_vec = np.reciprocal(self.work.rho_vec)
 
-        # Check if type of any constraint changed
-        constr_type_changed = (loose_ind != old_loose_ind).any() or \
-                              (eq_ind != old_eq_ind).any() or \
-                              (ineq_ind != old_ineq_ind).any()
-
-        # Update type of constraints
-        self.work.constr_type[loose_ind] = -1
-        self.work.constr_type[eq_ind] = 1
-        self.work.constr_type[ineq_ind] = 0
-
-        self.work.rho_vec[loose_ind] = RHO_MIN
-        self.work.rho_vec[eq_ind] = RHO_MAX
-        self.work.rho_vec[ineq_ind] = self.work.settings.rho
-
-        self.work.rho_inv_vec = np.reciprocal(self.work.rho_vec)
-
-        return constr_type_changed
+    # def update_rho_vec(self):
+    #     """
+    #     Update values of rho_vec and return 1 if type of some constraints
+    #     changed.
+    #     """
+    #     # Find indices of loose bounds, equality constr and one-sided constr
+    #     loose_ind = np.where(np.logical_and(
+    #                         self.work.data.l < -OSQP_INFTY*MIN_SCALING,
+    #                         self.work.data.u > OSQP_INFTY*MAX_SCALING))[0]
+    #     eq_ind = np.where(self.work.data.u - self.work.data.l < RHO_TOL)[0]
+    #     ineq_ind = np.setdiff1d(np.setdiff1d(np.arange(self.work.data.m),
+    #                             loose_ind), eq_ind)
+    #
+    #     # Find indices of current constraint types
+    #     old_loose_ind = np.where(self.work.constr_type == -1)
+    #     old_eq_ind = np.where(self.work.constr_type == 1)
+    #     old_ineq_ind = np.where(self.work.constr_type == 0)
+    #
+    #     # Check if type of any constraint changed
+    #     constr_type_changed = (loose_ind != old_loose_ind).any() or \
+    #                           (eq_ind != old_eq_ind).any() or \
+    #                           (ineq_ind != old_ineq_ind).any()
+    #
+    #     # Update type of constraints
+    #     self.work.constr_type[loose_ind] = -1
+    #     self.work.constr_type[eq_ind] = 1
+    #     self.work.constr_type[ineq_ind] = 0
+    #
+    #     self.work.rho_vec[loose_ind] = RHO_MIN
+    #     self.work.rho_vec[eq_ind] = RHO_MAX
+    #     self.work.rho_vec[ineq_ind] = self.work.settings.rho
+    #
+    #     self.work.rho_inv_vec = np.reciprocal(self.work.rho_vec)
+    #
+    #     return constr_type_changed
 
     def print_setup_header(self, data, settings):
         """Print solver header
