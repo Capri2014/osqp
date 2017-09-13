@@ -6,8 +6,8 @@ import numpy as np
 import mathprogbasepy as mpbpy
 sp.random.seed(2)
 
-n = 10
-m = 100
+n = 50
+m = 1000
 A = sparse.random(m, n, density=0.9,
                   data_rvs=np.random.randn,
                   format='csc')
@@ -34,7 +34,7 @@ q = sp.randn(n)
 # Test
 rho = 0.1
 # rho=10.0
-q /= 100
+# q /= 100
 # P *= 100
 # q *= 2000
 

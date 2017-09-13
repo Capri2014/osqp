@@ -454,63 +454,63 @@ class OSQP(object):
             E = E_temp.dot(E)
 
             # Second Step cost normalization
-            # avg_norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
-            # inf_norm_q = np.linalg.norm(q, np.inf)
-            # if inf_norm_q < 1e-06:
-            #     inf_norm_q = 1.0
-            #
-            # scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
-            # scale_cost = 1. / np.maximum(np.minimum(
-            #     scale_cost, MAX_SCALING), MIN_SCALING)
-            #
-            # print("avg_norm_P_cols", avg_norm_P_cols)
-            # print("inf_norm_q", inf_norm_q)
-            # print("Temp scale cost = %.2e" % scale_cost)
-            #
-            # # norm_cost = self._limit_scaling(norm_cost)
-            # # c_temp_prev = c_temp
-            # c_temp = scale_cost
-            #
-            # # Debug: avoid scaling!
-            # # c_temp = 1.0
-            #
-            # # Normalize cost
-            # P = c_temp * P
-            # q = c_temp * q
-            #
-            # # Update scaling
-            # c = c_temp * c
-            #
-            # print("Total scale cost = %.2e" % c)
+            avg_norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
+            inf_norm_q = np.linalg.norm(q, np.inf)
+            if inf_norm_q < 1e-06:
+                inf_norm_q = 1.0
+
+            scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
+            scale_cost = 1. / np.maximum(np.minimum(
+                scale_cost, MAX_SCALING), MIN_SCALING)
+
+            print("avg_norm_P_cols", avg_norm_P_cols)
+            print("inf_norm_q", inf_norm_q)
+            print("Temp scale cost = %.2e" % scale_cost)
+
+            # norm_cost = self._limit_scaling(norm_cost)
+            # c_temp_prev = c_temp
+            c_temp = scale_cost
+
+            # Debug: avoid scaling!
+            # c_temp = 1.0
+
+            # Normalize cost
+            P = c_temp * P
+            q = c_temp * q
+
+            # Update scaling
+            c = c_temp * c
+
+            print("Total scale cost = %.2e" % c)
 
             # if (abs(avg_norm_P_cols_prev - avg_norm_P_cols) < 1e-03):
             #     # Stop loop if it converges
             #     break
 
         # Independent cost normalization
-        avg_norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
-        inf_norm_q = np.linalg.norm(q, np.inf)
-        if inf_norm_q > 1e-06:
-            scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
-        else:
-            scale_cost = 1.0
-        # scale_cost = inf_norm_q + avg_norm_P_cols / 2
-
-        # scale_cost = inf_norm_q if inf_norm_q > 1e-06 else 1
-
-        scale_cost = 1. / np.maximum(np.minimum(
-            scale_cost, MAX_SCALING), MIN_SCALING)
-
-        # print("avg_norm_P_cols", avg_norm_P_cols)
-        print("inf_norm_q", inf_norm_q)
-        # print("Temp scale cost = %.2e" % scale_cost)
-
-        # Cost scaling
-        c = scale_cost
-
-        # Normalize cost
-        P = c * P
-        q = c * q
+        # avg_norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
+        # inf_norm_q = np.linalg.norm(q, np.inf)
+        # if inf_norm_q > 1e-06:
+        #     scale_cost = np.maximum(inf_norm_q, avg_norm_P_cols)
+        # else:
+        #     scale_cost = 1.0
+        # # scale_cost = inf_norm_q + avg_norm_P_cols / 2
+        #
+        # # scale_cost = inf_norm_q if inf_norm_q > 1e-06 else 1
+        #
+        # scale_cost = 1. / np.maximum(np.minimum(
+        #     scale_cost, MAX_SCALING), MIN_SCALING)
+        #
+        # # print("avg_norm_P_cols", avg_norm_P_cols)
+        # print("inf_norm_q", inf_norm_q)
+        # # print("Temp scale cost = %.2e" % scale_cost)
+        #
+        # # Cost scaling
+        # c = scale_cost
+        #
+        # # Normalize cost
+        # P = c * P
+        # q = c * q
 
 
         #
@@ -530,8 +530,6 @@ class OSQP(object):
 
         # if self.work.settings.verbose:
         #     print("Final cost scaling = %.10f" % c)
-
-
 
         # import ipdb; ipdb.set_trace()
 
