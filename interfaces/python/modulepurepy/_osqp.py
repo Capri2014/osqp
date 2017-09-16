@@ -194,25 +194,6 @@ class scaling(object):
         self.cinv = None
 
 
-class linesearch(object):
-    """
-    Vectors obtained from line search between the ADMM and the polished
-    solution
-
-    Attributes
-    ----------
-    X     - matrix in R^{N \\times n}
-    Z     - matrix in R^{N \\times m}
-    Y     - matrix in R^{N \\times m}
-    t     - vector in R^N
-    """
-    def __init__(self):
-        self.X = None
-        self.Z = None
-        self.Y = None
-        self.t = None
-
-
 class solution(object):
     """
     Solver solution vectors z, u
@@ -309,11 +290,10 @@ class results(object):
     y           - dual solution
     info        - info structure
     """
-    def __init__(self, solution, info, linesearch):
+    def __init__(self, solution, info):
         self.x = solution.x
         self.y = solution.y
         self.info = info
-        self.linesearch = linesearch
 
 
 class OSQP(object):
@@ -1090,6 +1070,8 @@ class OSQP(object):
         self.work.xz_tilde = np.zeros(n + m)
         self.work.x_prev = np.zeros(n)
         self.work.z_prev = np.zeros(m)
+        self.work.x_prev_prev = np.zeros(n)
+        self.work.z_prev_prev = np.zeros(m)
         self.work.y = np.zeros(m)
         self.work.delta_y = np.zeros(m)    # Delta_y for primal infeasibility
 
@@ -1140,9 +1122,15 @@ class OSQP(object):
         if not self.work.settings.warm_start:
             self.cold_start()
 
+        # Initialize cos angle
+        cos_angle_vec = []
+        count_line_search = 0
+
         # ADMM algorithm
         for iter in range(1, self.work.settings.max_iter + 1):
             # Update x_prev, z_prev
+            self.work.x_prev_prev = np.copy(self.work.x_prev)
+            self.work.z_prev_prev = np.copy(self.work.z_prev)
             self.work.x_prev = np.copy(self.work.x)
             self.work.z_prev = np.copy(self.work.z)
 
@@ -1150,13 +1138,39 @@ class OSQP(object):
             # First step: update \tilde{x} and \tilde{z}
             self.update_xz_tilde()
 
-            # Second step: update x and z
-            self.update_x()
+            # Check and perform line search
+            x_tilde = self.work.xz_tilde[:self.work.data.n]
+            z_tilde = self.work.xz_tilde[self.work.data.n:]
+            q = np.concatenate((x_tilde, z_tilde))
+            q_prev = np.concatenate((self.work.x_prev,
+                                     self.work.z_prev))
+            q_prev_prev = np.concatenate((self.work.x_prev_prev,
+                                          self.work.z_prev_prev))
+            delta_q = q - q_prev
+            delta_q_prev = q_prev - q_prev_prev
 
-            self.update_z()
+            eps = 1e-6
+            if la.norm(delta_q) < 1e-08 and la.norm(delta_q_prev) < 1e-08:
+                cos_angle = 0.0
+            else:
+                cos_angle = delta_q.dot(delta_q_prev) / \
+                    (la.norm(delta_q) * la.norm(delta_q_prev))
 
-            # Third step: update y
-            self.update_y()
+            line_search_condition = cos_angle > (1 - eps)
+
+            cos_angle_vec.append(cos_angle)
+
+            if line_search_condition:
+                count_line_search += 1
+                self.do_line_search()
+            else:
+                # Normal updates
+                # Second step: update x and z
+                self.update_x()
+                self.update_z()
+
+                # Third step: update y
+                self.update_y()
 
             if self.work.settings.early_terminate:
                 # Update info
@@ -1200,9 +1214,7 @@ class OSQP(object):
         # Solution polish
         if self.work.settings.polish and \
                 self.work.info.status_val == OSQP_SOLVED:
-                    ls = self.polish()
-        else:
-            ls = None
+                    self.polish()
 
         # Update total times
         if self.work.first_run:
@@ -1223,8 +1235,16 @@ class OSQP(object):
         if self.work.first_run:
             self.work.first_run = 0
 
+        # Plot stuff
+        import matplotlib.pylab as plt
+        plt.figure(0)
+        plt.plot(cos_angle_vec)
+        plt.show(block=False)
+
+        print("Number of line search activations = %i" % count_line_search)
+
         # Store results structure
-        return results(self.work.solution, self.work.info, ls)
+        return results(self.work.solution, self.work.info)
 
     #
     #   Auxiliary API Functions
@@ -1647,8 +1667,6 @@ class OSQP(object):
                       (self.work.pol.dua_res < self.work.info.dua_res) and \
                       (self.work.info.pri_res < 1e-10)
 
-        ls = linesearch()
-
         if pol_success:
             # Update solver information
             self.work.info.obj_val = self.work.pol.obj_val
@@ -1669,37 +1687,84 @@ class OSQP(object):
             self.work.info.status_polish = -1
 
             # Line search on the line connecting the ADMM and the polished sol.
-            ls.t = np.linspace(0., 0.002, 1000)
-            ls.X, ls.Z, ls.Y = self.line_search(
-                            self.work.x, self.work.z, self.work.y,
-                            self.work.pol.x, self.work.pol.z, self.work.pol.y,
-                            ls.t)
+            # ls.t = np.linspace(0., 0.002, 1000)
+            # ls.X, ls.Z, ls.Y = self.line_search(
+            #               self.work.x, self.work.z, self.work.y,
+            #               self.work.pol.x, self.work.pol.z, self.work.pol.y,
+            #               ls.t)
 
-        return ls
-
-    def line_search(self, x1, z1, y1, x2, z2, y2, t):
+    def do_line_search(self):
         """
-        Perform line search on the line between (x1,z1,y1) and (x2,z2,y2).
-        """
-        N = len(t)
-        X = np.zeros((N, self.work.data.n))
-        Z = np.zeros((N, self.work.data.m))
-        Y = np.zeros((N, self.work.data.m))
+        Perform line search on the line on the ray:
 
+            (x1, z1) + alpha * (x2 - x1, z2 - z1)
+
+        """
+
+        # Previous iterates
+        x1 = self.work.x
+        z1 = self.work.z
+        y1 = self.work.y
+
+        # New iterates
+        x2 = self.work.xz_tilde[:self.work.data.n]
+        z2 = self.work.xz_tilde[self.work.data.n:]
+
+        ALPHA_MAX = 1000
+
+        # Current residuals
+        pri_res = self.work.info.pri_res
+        dua_res = self.work.info.dua_res
+
+        # Start from maximum alpha
+        alpha = ALPHA_MAX
+
+        # Compute directions
         dx = x2 - x1
         dz = z2 - z1
-        dy = y2 - y1
 
-        for i in range(N):
-            X[i, :] = x1 + t[i] * dx
-            Z[i, :] = z1 + t[i] * dz
-            Y[i, :] = y1 + t[i] * dy
-            Z[i, :], Y[i, :] = self.project_normalcone(Z[i, :], Y[i, :])
+        # Initialize new residuals
+        new_pri_res = OSQP_INFTY
+        new_dua_res = OSQP_INFTY
 
-            # Unscale optimization variables (x,z,y)
-            if self.work.settings.scaling:
-                X[i, :] = self.work.scaling.D.dot(X[i, :])
-                Z[i, :] = self.work.scaling.Einv.dot(Z[i, :])
-                Y[i, :] = self.work.scaling.E.dot(Y[i, :])
+        # Perform line search
+        continue_line_search = True
+        while continue_line_search:
 
-        return (X, Z, Y)
+            # Compute new point
+            x_new = x1 + alpha * dx
+            z_new = z1 + alpha * dz
+            y_new = y1   # Do not extrapolate y
+
+            # Project onto normal cone
+            v = z_new + self.work.rho_inv_vec * y_new
+            z_new = self.project(v)
+            y_new = self.work.rho_vec * (v - z_new)
+
+            # Compute residuals
+            new_pri_res = self.compute_pri_res(x_new, z_new)
+            new_dua_res = self.compute_dua_res(x_new, y_new)
+
+            continue_line_search = \
+                ((new_pri_res > pri_res) or
+                 (new_dua_res > dua_res)) and (alpha > 2.0)
+
+            if continue_line_search:
+                # Decrease alpha
+                alpha *= 0.9
+
+        if alpha < 2.0:
+            # if self.work.settings.verbose:
+            #     print("LS: Failed to find better points")
+            self.work.x, self.work.z, self.work.y = x1, z1, y1
+        else:
+            if self.work.settings.verbose:
+                # Print details
+                print(("LS: Success! " +
+                       "(new_pri_res/pri_res) = (%.2e/%.2e),\t " %
+                       (new_pri_res, pri_res) +
+                       "(new_dua_res/dua_res) = (%.2e/%.2e)\t " %
+                       (new_dua_res, dua_res) +
+                       "alpha=%2.2f") % (alpha))
+
+            self.work.x, self.work.z, self.work.y = x_new, z_new, y_new

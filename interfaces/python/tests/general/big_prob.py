@@ -19,8 +19,8 @@ A = sparse.eye(n).tocsc()
 l = -1 * np.ones(n)
 u = 1 * np.ones(n)
 
-l += 10
-u += 10
+# l += 10
+# u += 10
 
 # l *= 1000
 # u *= 1000
@@ -44,10 +44,11 @@ q = sp.randn(n)
 # q = q
 
 # Test
-rho = 10.
+# rho = 0.1
 # rho=10.0
-q /= 100
-# P *= 100
+rho = 0.01
+# q /= 100
+P *= 100
 # q *= 2000
 
 
@@ -66,7 +67,7 @@ osqp_opts = {'rho': rho,
              }
 
 qp = mpbpy.QuadprogProblem(P, q, A, l, u)
-res_gurobi = qp.solve(solver=mpbpy.GUROBI, verbose=True)
+res_gurobi = qp.solve(solver=mpbpy.GUROBI, verbose=False)
 # res_purepy = qp.solve(solver=mpbpy.OSQP_PUREPY, **osqp_opts)
 # res_osqp = qp.solve(solver=mpbpy.OSQP, **osqp_opts)
 
