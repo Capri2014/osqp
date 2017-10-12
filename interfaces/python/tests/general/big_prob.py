@@ -6,21 +6,21 @@ import numpy as np
 import mathprogbasepy as mpbpy
 sp.random.seed(2)
 
-n = 100
+n = 100 
 m = 1000
 A = sparse.random(m, n, density=0.5,
                   data_rvs=np.random.randn,
                   format='csc')
-l = -1. - np.random.rand(m)
-u = 1 + np.random.rand(m)
+l = -100. - np.random.rand(m)
+u = 100 + np.random.rand(m)
 
 
-# A = sparse.eye(n).tocsc()
-# l = -1 * np.ones(n)
-# u = 1 * np.ones(n)
+#  A = sparse.eye(n).tocsc()
+#  l = -1 * np.ones(n)
+#  u = 1 * np.ones(n)
 
-# l += 10
-# u += 10
+#  l += 1000
+#  u += 1000
 
 # l *= 1000
 # u *= 1000
@@ -46,14 +46,14 @@ q = sp.randn(n)
 # Test
 rho = 0.1
 # rho=10.0
-# q /= 100
-# P *= 100
+#  q /= 100
+#  P *= 100
 # q *= 2000
 
 
 osqp_opts = {'rho': rho,
              #  'auto_rho': True,
-             'sigma': 1e-06,
+             #  'sigma': 1e-06,
             #  'eps_rel': 1e-05,
             #  'eps_abs': 1e-05,
              'scaled_termination': False,
@@ -76,35 +76,46 @@ model.setup(P=P, q=q, A=A, l=l, u=u, **osqp_opts)
 res_osqppurepy = model.solve()
 
 # Solve with SuiteSparse LDL
-model = osqp.OSQP()
-model.setup(P=P, q=q, A=A, l=l, u=u, **osqp_opts)
-res_osqp = model.solve()
-
-# Solve with Pardiso
-model2 = osqp.OSQP()
-osqp_opts['linsys_solver'] = 'mkl pardiso'
-model2.setup(P=P, q=q, A=A, l=l, u=u, **osqp_opts)
-res_osqp2 = model2.solve()
-model2 = 1
-
-# Solve with Pardiso
-model3 = osqp.OSQP()
-model3.setup(P=P, q=q, A=A, l=l, u=u, **osqp_opts)
-res_osqp3 = model3.solve()
-
-print("Difference SuiteSparse LDL vs Pardiso")
-print("SuiteSparse LDL runtime = %.4f" % res_osqp.info.run_time)
-print("Pardiso runtime         = %.4f" % res_osqp2.info.run_time)
+#  model = osqp.OSQP()
+#  model.setup(P=P, q=q, A=A, l=l, u=u, **osqp_opts)
+#  res_osqp = model.solve()
+#
+#  # Solve with Pardiso
+#  model2 = osqp.OSQP()
+#  osqp_opts['linsys_solver'] = 'mkl pardiso'
+#  model2.setup(P=P, q=q, A=A, l=l, u=u, **osqp_opts)
+#  res_osqp2 = model2.solve()
+#  model2 = 1
+#
+#  # Solve with Pardiso
+#  model3 = osqp.OSQP()
+#  model3.setup(P=P, q=q, A=A, l=l, u=u, **osqp_opts)
+#  res_osqp3 = model3.solve()
+#
+#  print("Difference SuiteSparse LDL vs Pardiso")
+#  print("SuiteSparse LDL runtime = %.4f" % res_osqp.info.run_time)
+#  print("Pardiso runtime         = %.4f" % res_osqp2.info.run_time)
+#
 
 # Check difference with gurobi
 if res_gurobi.status == 'optimal':
     print("Difference OSQP vs Gurobi")
+    print("  - obj_val = %.4f" %
+          (np.linalg.norm(res_gurobi.obj_val - res_osqppurepy.info.obj_val)))
     print("  - primal = %.4f" %
-          (np.linalg.norm(res_gurobi.x - res_osqp.x) /
-           np.linalg.norm(res_gurobi.x)))
+          (np.linalg.norm(res_gurobi.x - res_osqppurepy.x)))
     print("  - dual = %.4f" %
-          (np.linalg.norm(res_gurobi.y - res_osqp.y) /
-           np.linalg.norm(res_gurobi.y)))
+          (np.linalg.norm(res_gurobi.y - res_osqppurepy.y)))
+
+# Check difference with gurobi
+#  if res_gurobi.status == 'optimal':
+#      print("Difference OSQP vs Gurobi")
+#      print("  - primal = %.4f" %
+#            (np.linalg.norm(res_gurobi.x - res_osqp.x) /
+#             np.linalg.norm(res_gurobi.x)))
+#      print("  - dual = %.4f" %
+#            (np.linalg.norm(res_gurobi.y - res_osqp.y) /
+#             np.linalg.norm(res_gurobi.y)))
 
 
 # Solve with SCS
