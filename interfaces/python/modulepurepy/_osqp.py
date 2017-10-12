@@ -450,52 +450,87 @@ class OSQP(object):
             D = D_temp.dot(D)
             E = E_temp.dot(E)
 
+            #  #
+            #  # Second Step bounds scaling
+            #  #
+            #  avg_l = np.abs(l).mean()
+            #  avg_u = np.abs(u).mean()
+            #  b_temp = .5 * (avg_l + avg_u)
             #
-            # Second Step bounds scaling
+            #  # TODO: Check for infinity values
+            #  # TODO: Check for zeros
+            #  #  b_temp = 1.0
             #
-            b_temp = 1.0
-
-            # DEBUG: Set cost scaling to 2
-            #  if i == 0:
-            #      b_temp = 10.0
-
-            # Scale data in place
-            l = b_temp * l
-            u = b_temp * u
-            P = P / (b_temp ** 2) 
-            q = q / b_temp
-
-            #  Update bounds scaling
-            b = b * b_temp
-
-            # Third Step cost normalization
-            norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
-            inf_norm_q = np.linalg.norm(q, np.inf)
-            inf_norm_q = self._limit_scaling(inf_norm_q)
-            scale_cost = np.maximum(inf_norm_q, norm_P_cols)
-            scale_cost = self._limit_scaling(scale_cost)
-            scale_cost = 1. / scale_cost
-
-            c_temp = scale_cost
-
-            # Normalize cost
-            P = c_temp * P
-            q = c_temp * q
-
-            # Update scaling
-            c = c_temp * c
+            #  # DEBUG: Set cost scaling to 2
+            #  #  if i == 0:
+            #  #      b_temp = 10.0
+            #
+            #  # Scale data in place
+            #  l = b_temp * l
+            #  u = b_temp * u
+            #  P = P / (b_temp ** 2)
+            #  q = q / b_temp
+            #
+            #  #  Update bounds scaling
+            #  b = b * b_temp
+            #
+            #  # Third Step cost normalization
+            #  norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
+            #  inf_norm_q = np.linalg.norm(q, np.inf)
+            #  inf_norm_q = self._limit_scaling(inf_norm_q)
+            #  scale_cost = np.maximum(inf_norm_q, norm_P_cols)
+            #  scale_cost = self._limit_scaling(scale_cost)
+            #  scale_cost = 1. / scale_cost
+            #
+            #  c_temp = scale_cost
+            #
+            #  # Normalize cost
+            #  P = c_temp * P
+            #  q = c_temp * q
+            #
+            #  # Update scaling
+            #  c = c_temp * c
 
             if self.work.settings.verbose:
                 print("Current cost scaling = %.10f" % c)
                 print("Current bounds scaling = %.10f" % b)
 
-        # DEBUG: Scale bounds in the end
-        b_temp = 0.01
+        # DEBUG: Scale in the end
+        # Second Step bounds scaling
+        avg_l = np.abs(l).mean()
+        avg_u = np.abs(u).mean()
+        b_temp = 1. / (.5 * (avg_l + avg_u))
+        import ipdb; ipdb.set_trace()
+
+        # TODO: Check for infinity values
+        # TODO: Check for zeros
+        #  b_temp = 1.0
+
+        # Scale data in place
         l = b_temp * l
         u = b_temp * u
-        P = P / (b_temp ** 2)
+        P = P / (b_temp ** 2) 
         q = q / b_temp
-        b = b * b_temp  # Update final bounds scaling
+
+        #  Update bounds scaling
+        b = b * b_temp
+
+        # Third Step cost normalization
+        norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
+        inf_norm_q = np.linalg.norm(q, np.inf)
+        inf_norm_q = self._limit_scaling(inf_norm_q)
+        scale_cost = np.maximum(inf_norm_q, norm_P_cols)
+        scale_cost = self._limit_scaling(scale_cost)
+        scale_cost = 1. / scale_cost
+
+        c_temp = scale_cost
+
+        # Normalize cost
+        P = c_temp * P
+        q = c_temp * q
+
+        # Update scaling
+        c = c_temp * c
         
         if self.work.settings.verbose:
             print("Final cost scaling = %.10f" % c)

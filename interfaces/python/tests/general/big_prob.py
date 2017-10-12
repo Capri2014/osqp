@@ -44,7 +44,7 @@ q = sp.randn(n)
 # q = q
 
 # Test
-rho = 0.1
+rho = 1.0
 # rho=10.0
 #  q /= 100
 #  P *= 100
