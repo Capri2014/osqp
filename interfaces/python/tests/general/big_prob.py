@@ -7,12 +7,12 @@ import mathprogbasepy as mpbpy
 sp.random.seed(2)
 
 n = 100 
-m = 1000
+m = 500
 A = sparse.random(m, n, density=0.5,
                   data_rvs=np.random.randn,
                   format='csc')
-l = -100. - np.random.rand(m)
-u = 100 + np.random.rand(m)
+l = -10. - np.random.rand(m)
+u = 1 + np.random.rand(m)
 
 
 #  A = sparse.eye(n).tocsc()
@@ -44,12 +44,21 @@ q = sp.randn(n)
 # q = q
 
 # Test
-rho = 1.0
-# rho=10.0
+#  rho = 0.001
+#  rho = 1./26.
+rho = 1./ 1.49
+#  rho=10.0
 #  q /= 100
 #  P *= 100
 # q *= 2000
 
+# Compute optimal rho
+P_inv = sparse.csc_matrix(np.linalg.inv(P.todense()))
+M = A.dot(P_inv).dot(A.T)
+lambdas, _ = np.linalg.eig(M.todense())
+lambda_min = np.min(np.abs(lambdas))
+lambda_max = np.max(np.abs(lambdas))
+rho_opt = 1. / (np.sqrt(lambda_min * lambda_max))
 
 osqp_opts = {'rho': rho,
              #  'auto_rho': True,

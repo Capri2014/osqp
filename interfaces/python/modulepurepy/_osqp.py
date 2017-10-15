@@ -474,22 +474,22 @@ class OSQP(object):
             #  #  Update bounds scaling
             #  b = b * b_temp
             #
-            #  # Third Step cost normalization
-            #  norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
-            #  inf_norm_q = np.linalg.norm(q, np.inf)
-            #  inf_norm_q = self._limit_scaling(inf_norm_q)
-            #  scale_cost = np.maximum(inf_norm_q, norm_P_cols)
-            #  scale_cost = self._limit_scaling(scale_cost)
-            #  scale_cost = 1. / scale_cost
-            #
-            #  c_temp = scale_cost
-            #
-            #  # Normalize cost
-            #  P = c_temp * P
-            #  q = c_temp * q
-            #
-            #  # Update scaling
-            #  c = c_temp * c
+            # Third Step cost normalization
+            norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
+            inf_norm_q = np.linalg.norm(q, np.inf)
+            inf_norm_q = self._limit_scaling(inf_norm_q)
+            scale_cost = np.maximum(inf_norm_q, norm_P_cols)
+            scale_cost = self._limit_scaling(scale_cost)
+            scale_cost = 1. / scale_cost
+
+            c_temp = scale_cost
+
+            # Normalize cost
+            P = c_temp * P
+            q = c_temp * q
+
+            # Update scaling
+            c = c_temp * c
 
             if self.work.settings.verbose:
                 print("Current cost scaling = %.10f" % c)
@@ -499,8 +499,11 @@ class OSQP(object):
         # Second Step bounds scaling
         avg_l = np.abs(l).mean()
         avg_u = np.abs(u).mean()
-        b_temp = 1. / (.5 * (avg_l + avg_u))
-        import ipdb; ipdb.set_trace()
+        avg_lu = min(avg_l, avg_u)
+        norm_A_cols = spla.norm(A, np.inf, axis=0).mean()
+        b_temp = norm_A_cols / avg_lu
+        b_temp = 1.0  # DEBUG useless value
+        #  import ipdb; ipdb.set_trace()
 
         # TODO: Check for infinity values
         # TODO: Check for zeros
@@ -516,22 +519,24 @@ class OSQP(object):
         b = b * b_temp
 
         # Third Step cost normalization
-        norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
-        inf_norm_q = np.linalg.norm(q, np.inf)
-        inf_norm_q = self._limit_scaling(inf_norm_q)
-        scale_cost = np.maximum(inf_norm_q, norm_P_cols)
-        scale_cost = self._limit_scaling(scale_cost)
-        scale_cost = 1. / scale_cost
+        #  norm_P_cols = spla.norm(P, np.inf, axis=0).mean()
+        #  inf_norm_q = np.linalg.norm(q, np.inf)
+        #  inf_norm_q = self._limit_scaling(inf_norm_q)
+        #  scale_cost = np.maximum(inf_norm_q, norm_P_cols)
+        #  scale_cost = self._limit_scaling(scale_cost)
+        #  scale_cost = 1. / scale_cost
+        #
+        #  c_temp = scale_cost
+        #
+        #  # Normalize cost
+        #  P = c_temp * P
+        #  q = c_temp * q
+        #
+        #  # Update scaling
+        #  c = c_temp * c
+        #
+        #  import ipdb; ipdb.set_trace()
 
-        c_temp = scale_cost
-
-        # Normalize cost
-        P = c_temp * P
-        q = c_temp * q
-
-        # Update scaling
-        c = c_temp * c
-        
         if self.work.settings.verbose:
             print("Final cost scaling = %.10f" % c)
             print("Final bounds scaling = %.10f" % b)
@@ -1217,6 +1222,14 @@ class OSQP(object):
         # Cold start if not warm start
         if not self.work.settings.warm_start:
             self.cold_start()
+        
+        # Store norm of x, y, primal and dual residuals
+        norm_x_vec = []
+        norm_y_vec = []
+        norm_x_over_y_vec = []
+        norm_pri_res_vec = []
+        norm_dua_res_vec = []
+        norm_res_ratio_vec = []
 
         # ADMM algorithm
         for iter in range(1, self.work.settings.max_iter + 1):
@@ -1235,6 +1248,18 @@ class OSQP(object):
 
             # Third step: update y
             self.update_y()
+
+            # Store norms
+            norm_x_vec.append(la.norm(self.work.x))
+            norm_y_vec.append(la.norm(self.work.y))
+            norm_x_over_y_vec.append(norm_x_vec[-1]/norm_y_vec[-1])
+            norm_pri_res_vec.append(
+                    la.norm(self.work.data.A.dot(self.work.x) - self.work.z))
+            norm_dua_res_vec.append(
+                    la.norm(self.work.data.P.dot(self.work.x) +
+                            self.work.data.q +
+                            self.work.data.A.T.dot(self.work.y)))
+            norm_res_ratio_vec.append(norm_pri_res_vec[-1]/norm_dua_res_vec[-1])
 
             if self.work.settings.early_terminate:
                 # Update info
@@ -1291,6 +1316,20 @@ class OSQP(object):
         # Print footer
         if self.work.settings.verbose:
             self.print_footer()
+
+        # Plot results
+        import matplotlib.pylab as plt
+        f, axarr = plt.subplots(2, sharex=True)
+        axarr[0].semilogy(norm_x_vec, label='norm(x)')
+        axarr[0].semilogy(norm_y_vec, label='norm(y)')
+        axarr[0].semilogy(norm_x_over_y_vec, label='norm(x)/norm(y)')
+        axarr[0].legend()
+        axarr[1].semilogy(norm_pri_res_vec, label='norm(pri_res)')
+        axarr[1].semilogy(norm_dua_res_vec, label='norm(dua_res)')
+        axarr[1].semilogy(norm_res_ratio_vec,
+                          label='norm(pri_res)/norm(dua_res)')
+        axarr[1].legend()
+        plt.show(block=False)
 
         # Store solution
         self.store_solution()
